@@ -280,6 +280,9 @@ namespace FileCabinetApp
                 case "firstname":
                     PrintRecords(fileCabinetService.FindByFirstName(value));
                     break;
+                case "lastname":
+                    PrintRecords(fileCabinetService.FindByLastName(value));
+                    break;
                 default:
                     Console.WriteLine($"The property '{property}' is not supported for search.");
                     break;

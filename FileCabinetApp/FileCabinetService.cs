@@ -120,5 +120,12 @@ namespace FileCabinetApp
                 .Where(record => string.Equals(record.FirstName, firstName, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
         }
+
+        public FileCabinetRecord[] FindByLastName(string lastName)
+        {
+            return this.list
+                .Where(record => string.Equals(record.LastName, lastName, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
     }
 }
