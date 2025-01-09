@@ -22,6 +22,7 @@ namespace FileCabinetApp
             new Tuple<string, Action<string>>("stat", Stat),
             new Tuple<string, Action<string>>("create", Create),
             new Tuple<string, Action<string>>("list", List),
+            new Tuple<string, Action<string>>("edit", Edit),
         };
 
         private static string[][] helpMessages = new string[][]
@@ -31,6 +32,7 @@ namespace FileCabinetApp
             new string[] { "stat", "shows the statistics of records", "The 'stat' command shows the number of records." },
             new string[] { "create", "creates a new record", "The 'create' command creates a new record with personal data." },
             new string[] { "list", "lists all records", "The 'list' command lists all records in the system." },
+            new string[] { "edit", "edits an existing record", "The 'edit' command modifies an existing record by ID." },
         };
 
         public static void Main(string[] args)
@@ -194,6 +196,68 @@ namespace FileCabinetApp
             foreach (var record in records)
             {
                 Console.WriteLine($"#{record.Id}, {record.FirstName}, {record.LastName}, {record.DateOfBirth:yyyy-MMM-dd}, {record.Height} cm, {record.Salary:C}, {record.Gender}");
+            }
+        }
+
+        private static void Edit(string parameters)
+        {
+            if (string.IsNullOrWhiteSpace(parameters))
+            {
+                Console.WriteLine("You must specify the ID of the record to edit.");
+                return;
+            }
+
+            if (!int.TryParse(parameters, out int id) || id <= 0)
+            {
+                Console.WriteLine("Invalid ID. Please enter a positive integer.");
+                return;
+            }
+
+            try
+            {
+                Console.Write("First name: ");
+                string firstName = Console.ReadLine() ?? string.Empty;
+
+                Console.Write("Last name: ");
+                string lastName = Console.ReadLine() ?? string.Empty;
+
+                Console.Write("Date of birth (MM/DD/YYYY): ");
+                if (!DateTime.TryParse(Console.ReadLine(), out DateTime dateOfBirth))
+                {
+                    throw new ArgumentException("Invalid date format.");
+                }
+
+                Console.Write("Height (cm): ");
+                if (!short.TryParse(Console.ReadLine(), out short height) || height <= 0 || height > 300)
+                {
+                    throw new ArgumentException("Height must be a positive number and less than 300 cm.");
+                }
+
+                Console.Write("Salary: ");
+                if (!decimal.TryParse(Console.ReadLine(), out decimal salary) || salary <= 0)
+                {
+                    throw new ArgumentException("Salary must be a positive number.");
+                }
+
+                Console.Write("Gender (M/F/N): ");
+                string genderInput = Console.ReadLine() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(genderInput) || genderInput.Length != 1)
+                {
+                    throw new ArgumentException("Gender must be a single character: 'M', 'F', or 'N'.");
+                }
+
+                char gender = char.ToUpper(genderInput[0], CultureInfo.InvariantCulture);
+
+                fileCabinetService.EditRecord(id, firstName, lastName, dateOfBirth, height, salary, gender);
+                Console.WriteLine($"Record #{id} is updated.");
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error: {ex.Message}");
             }
         }
     }
