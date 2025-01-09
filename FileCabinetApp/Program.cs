@@ -23,6 +23,7 @@ namespace FileCabinetApp
             new Tuple<string, Action<string>>("create", Create),
             new Tuple<string, Action<string>>("list", List),
             new Tuple<string, Action<string>>("edit", Edit),
+            new Tuple<string, Action<string>>("find", Find),
         };
 
         private static string[][] helpMessages = new string[][]
@@ -33,6 +34,7 @@ namespace FileCabinetApp
             new string[] { "create", "creates a new record", "The 'create' command creates a new record with personal data." },
             new string[] { "list", "lists all records", "The 'list' command lists all records in the system." },
             new string[] { "edit", "edits an existing record", "The 'edit' command modifies an existing record by ID." },
+            new string[] { "find", "finds records by a specific property", "The 'find' command searches records by property (firstname, lastname, dateofbirth)." },
         };
 
         public static void Main(string[] args)
@@ -258,6 +260,65 @@ namespace FileCabinetApp
             catch (Exception ex)
             {
                 Console.WriteLine($"Unexpected error: {ex.Message}");
+            }
+        }
+
+        private static void Find(string parameters)
+        {
+            var inputs = parameters.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (inputs.Length != 2)
+            {
+                Console.WriteLine("Invalid command format. Use: find <property> <value>");
+                return;
+            }
+
+            string property = inputs[0].ToLowerInvariant();
+            string value = inputs[1].Trim('"').Trim(); // Удаляем кавычки и пробелы
+
+            FileCabinetRecord[] results;
+
+            switch (property)
+            {
+                case "firstname":
+                    results = fileCabinetService.FindByFirstName(value);
+                    break;
+
+                case "lastname":
+                    results = fileCabinetService.FindByLastName(value);
+                    break;
+
+                case "dateofbirth":
+                    if (DateTime.TryParse(value, out DateTime dateOfBirth))
+                    {
+                        results = fileCabinetService.FindByDateOfBirth(dateOfBirth);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Invalid date format. Use: MM/DD/YYYY.");
+                        return;
+                    }
+
+                    break;
+
+                default:
+                    Console.WriteLine($"Unknown property '{property}'. Available properties: firstname, lastname, dateofbirth.");
+                    return;
+            }
+
+            if (results.Length == 0)
+            {
+                Console.WriteLine("No records found.");
+                return;
+            }
+
+            PrintRecords(results);
+        }
+
+        private static void PrintRecords(FileCabinetRecord[] records)
+        {
+            foreach (var record in records)
+            {
+                Console.WriteLine($"#{record.Id}, {record.FirstName}, {record.LastName}, {record.DateOfBirth:yyyy-MMM-dd}, {record.Height} cm, {record.Salary:C}, {record.Gender}");
             }
         }
     }
