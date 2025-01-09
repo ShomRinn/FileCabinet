@@ -47,7 +47,7 @@ namespace FileCabinetApp
                 DateOfBirth = dateOfBirth,
                 Height = height,
                 Salary = salary,
-                Gender = gender
+                Gender = gender,
             };
 
             this.list.Add(record);
