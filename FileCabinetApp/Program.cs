@@ -283,6 +283,17 @@ namespace FileCabinetApp
                 case "lastname":
                     PrintRecords(fileCabinetService.FindByLastName(value));
                     break;
+                case "dateofbirth":
+                    if (DateTime.TryParse(value, out var dateOfBirth))
+                    {
+                        PrintRecords(fileCabinetService.FindByDateOfBirth(dateOfBirth));
+                    }
+                    else
+                    {
+                        Console.WriteLine("Invalid date format. Use MM/DD/YYYY.");
+                    }
+
+                    break;
                 default:
                     Console.WriteLine($"The property '{property}' is not supported for search.");
                     break;
