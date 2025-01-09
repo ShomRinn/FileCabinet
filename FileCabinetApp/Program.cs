@@ -23,6 +23,7 @@ namespace FileCabinetApp
             new Tuple<string, Action<string>>("create", Create),
             new Tuple<string, Action<string>>("list", List),
             new Tuple<string, Action<string>>("edit", Edit),
+            new Tuple<string, Action<string>>("find", Find),
         };
 
         private static string[][] helpMessages = new string[][]
@@ -258,6 +259,38 @@ namespace FileCabinetApp
             catch (Exception ex)
             {
                 Console.WriteLine($"Unexpected error: {ex.Message}");
+            }
+        }
+
+        private static void Find(string parameters)
+        {
+            var inputs = parameters?.Split(' ', 2);
+
+            if (inputs == null || inputs.Length < 2)
+            {
+                Console.WriteLine("Invalid parameters. Usage: find <property> <value>");
+                return;
+            }
+
+            var property = inputs[0].ToLowerInvariant();
+            var value = inputs[1].Trim('"');
+
+            switch (property)
+            {
+                case "firstname":
+                    PrintRecords(fileCabinetService.FindByFirstName(value));
+                    break;
+                default:
+                    Console.WriteLine($"The property '{property}' is not supported for search.");
+                    break;
+            }
+        }
+
+        private static void PrintRecords(FileCabinetRecord[] records)
+        {
+            foreach (var record in records)
+            {
+                Console.WriteLine($"#{record.Id}, {record.FirstName}, {record.LastName}, {record.DateOfBirth:yyyy-MMM-dd}");
             }
         }
     }
