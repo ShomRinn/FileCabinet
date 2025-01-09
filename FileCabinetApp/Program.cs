@@ -1,4 +1,7 @@
-﻿namespace FileCabinetApp
+﻿using System;
+using System.Globalization;
+
+namespace FileCabinetApp
 {
     public static class Program
     {
@@ -10,16 +13,24 @@
 
         private static bool isRunning = true;
 
+        private static readonly FileCabinetService fileCabinetService = new FileCabinetService();
+
         private static Tuple<string, Action<string>>[] commands = new Tuple<string, Action<string>>[]
         {
             new Tuple<string, Action<string>>("help", PrintHelp),
             new Tuple<string, Action<string>>("exit", Exit),
+            new Tuple<string, Action<string>>("stat", Stat),
+            new Tuple<string, Action<string>>("create", Create),
+            new Tuple<string, Action<string>>("list", List)
         };
 
         private static string[][] helpMessages = new string[][]
         {
             new string[] { "help", "prints the help screen", "The 'help' command prints the help screen." },
             new string[] { "exit", "exits the application", "The 'exit' command exits the application." },
+            new string[] { "stat", "shows the statistics of records", "The 'stat' command shows the number of records." },
+            new string[] { "create", "creates a new record", "The 'create' command creates a new record with personal data." },
+            new string[] { "list", "lists all records", "The 'list' command lists all records in the system." }
         };
 
         public static void Main(string[] args)
@@ -42,7 +53,7 @@
                     continue;
                 }
 
-                var index = Array.FindIndex(commands, 0, commands.Length, i => i.Item1.Equals(command, StringComparison.InvariantCultureIgnoreCase));
+                var index = Array.FindIndex(commands, 0, commands.Length, i => i.Item1.Equals(command, StringComparison.OrdinalIgnoreCase));
                 if (index >= 0)
                 {
                     const int parametersIndex = 1;
@@ -67,7 +78,7 @@
         {
             if (!string.IsNullOrEmpty(parameters))
             {
-                var index = Array.FindIndex(helpMessages, 0, helpMessages.Length, i => string.Equals(i[Program.CommandHelpIndex], parameters, StringComparison.InvariantCultureIgnoreCase));
+                var index = Array.FindIndex(helpMessages, 0, helpMessages.Length, i => string.Equals(i[Program.CommandHelpIndex], parameters, StringComparison.OrdinalIgnoreCase));
                 if (index >= 0)
                 {
                     Console.WriteLine(helpMessages[index][Program.ExplanationHelpIndex]);
@@ -94,6 +105,66 @@
         {
             Console.WriteLine("Exiting an application...");
             isRunning = false;
+        }
+
+        private static void Stat(string parameters)
+        {
+            var recordsCount = fileCabinetService.GetStat();
+            Console.WriteLine($"{recordsCount} record(s).");
+        }
+
+        private static void Create(string parameters)
+        {
+            Console.Write("First name: ");
+            var firstName = Console.ReadLine();
+
+            Console.Write("Last name: ");
+            var lastName = Console.ReadLine();
+
+            Console.Write("Date of birth (MM/DD/YYYY): ");
+            var dateOfBirthInput = Console.ReadLine();
+            if (!DateTime.TryParse(dateOfBirthInput, new CultureInfo("en-US"), DateTimeStyles.None, out var dateOfBirth))
+            {
+                Console.WriteLine("Invalid date format.");
+                return;
+            }
+
+            Console.Write("Height (cm): ");
+            if (!short.TryParse(Console.ReadLine(), out var height))
+            {
+                Console.WriteLine("Invalid height format.");
+                return;
+            }
+
+            Console.Write("Salary: ");
+            if (!decimal.TryParse(Console.ReadLine(), out var salary))
+            {
+                Console.WriteLine("Invalid salary format.");
+                return;
+            }
+
+            Console.Write("Gender (M/F): ");
+            var genderInput = Console.ReadLine();
+            if (string.IsNullOrEmpty(genderInput) || genderInput.Length != 1)
+            {
+                Console.WriteLine("Invalid gender format.");
+                return;
+            }
+
+            var gender = genderInput[0];
+
+            var recordId = fileCabinetService.CreateRecord(firstName, lastName, dateOfBirth, height, salary, gender);
+            Console.WriteLine($"Record #{recordId} is created.");
+        }
+
+        private static void List(string parameters)
+        {
+            var records = fileCabinetService.GetRecords();
+
+            foreach (var record in records)
+            {
+                Console.WriteLine($"#{record.Id}, {record.FirstName}, {record.LastName}, {record.DateOfBirth:yyyy-MMM-dd}, {record.Height} cm, {record.Salary:C}, {record.Gender}");
+            }
         }
     }
 }
