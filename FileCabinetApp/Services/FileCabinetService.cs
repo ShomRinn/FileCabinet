@@ -1,39 +1,48 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
+using FileCabinetApp.Models;
+using FileCabinetApp.Validators;
 
-namespace FileCabinetApp
+namespace FileCabinetApp.Services
 {
     public class FileCabinetService
     {
-        private readonly List<FileCabinetRecord> list = new List<FileCabinetRecord>();
+        private readonly List<FileCabinetRecord> list = new ();
+        private readonly IRecordValidator validator;
         private readonly Dictionary<string, List<FileCabinetRecord>> firstNameDictionary = new (StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<FileCabinetRecord>> lastNameDictionary = new (StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<DateTime, List<FileCabinetRecord>> dateOfBirthDictionary = new ();
 
+        public FileCabinetService(IRecordValidator validator)
+        {
+            this.validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        }
+
         public int CreateRecord(string firstName, string lastName, DateTime dateOfBirth, short height, decimal salary, char gender)
         {
-            ValidateParameters(firstName, lastName, dateOfBirth, height, salary, gender);
-
             var record = new FileCabinetRecord
             {
                 Id = this.list.Count + 1,
                 FirstName = firstName,
                 LastName = lastName,
-                DateOfBirth = DateTime.SpecifyKind(dateOfBirth, DateTimeKind.Local),
+                DateOfBirth = dateOfBirth,
                 Height = height,
                 Salary = salary,
                 Gender = gender,
             };
+
+            this.validator.ValidateParameters(record);
 
             this.list.Add(record);
             this.UpdateDictionaries(record);
             return record.Id;
         }
 
-        public FileCabinetRecord[] GetRecords()
+        public ReadOnlyCollection<FileCabinetRecord> GetRecords()
         {
-            return this.list.ToArray();
+            return this.list.AsReadOnly();
         }
 
         public int GetStat()
@@ -51,66 +60,48 @@ namespace FileCabinetApp
 
             this.RemoveFromDictionaries(record);
 
-            ValidateParameters(firstName, lastName, dateOfBirth, height, salary, gender);
+            var updatedRecord = new FileCabinetRecord
+            {
+                Id = id,
+                FirstName = firstName,
+                LastName = lastName,
+                DateOfBirth = dateOfBirth,
+                Height = height,
+                Salary = salary,
+                Gender = gender,
+            };
 
-            record.FirstName = firstName;
-            record.LastName = lastName;
-            record.DateOfBirth = DateTime.SpecifyKind(dateOfBirth, DateTimeKind.Local);
-            record.Height = height;
-            record.Salary = salary;
-            record.Gender = gender;
+            this.validator.ValidateParameters(updatedRecord);
+
+            record.FirstName = updatedRecord.FirstName;
+            record.LastName = updatedRecord.LastName;
+            record.DateOfBirth = updatedRecord.DateOfBirth;
+            record.Height = updatedRecord.Height;
+            record.Salary = updatedRecord.Salary;
+            record.Gender = updatedRecord.Gender;
 
             this.UpdateDictionaries(record);
         }
 
-        public FileCabinetRecord[] FindByFirstName(string firstName)
+        public ReadOnlyCollection<FileCabinetRecord> FindByFirstName(string firstName)
         {
-            return this.firstNameDictionary.TryGetValue(firstName, out var records) ? records.ToArray() : Array.Empty<FileCabinetRecord>();
+            return this.firstNameDictionary.TryGetValue(firstName, out var records)
+                ? new ReadOnlyCollection<FileCabinetRecord>(records)
+                : new ReadOnlyCollection<FileCabinetRecord>(new List<FileCabinetRecord>());
         }
 
-        public FileCabinetRecord[] FindByLastName(string lastName)
+        public ReadOnlyCollection<FileCabinetRecord> FindByLastName(string lastName)
         {
-            return this.lastNameDictionary.TryGetValue(lastName, out var records) ? records.ToArray() : Array.Empty<FileCabinetRecord>();
+            return this.lastNameDictionary.TryGetValue(lastName, out var records)
+                ? new ReadOnlyCollection<FileCabinetRecord>(records)
+                : new ReadOnlyCollection<FileCabinetRecord>(new List<FileCabinetRecord>());
         }
 
-        public FileCabinetRecord[] FindByDateOfBirth(DateTime dateOfBirth)
+        public ReadOnlyCollection<FileCabinetRecord> FindByDateOfBirth(DateTime dateOfBirth)
         {
-            return this.dateOfBirthDictionary.TryGetValue(dateOfBirth.Date, out var records) ? records.ToArray() : Array.Empty<FileCabinetRecord>();
-        }
-
-        private static void ValidateParameters(string firstName, string lastName, DateTime dateOfBirth, short height, decimal salary, char gender)
-        {
-            if (string.IsNullOrWhiteSpace(firstName) || firstName.Length < 2 || firstName.Length > 60)
-            {
-                throw new ArgumentException("First name must be between 2 and 60 characters and cannot be empty or contain only spaces.");
-            }
-
-            if (string.IsNullOrWhiteSpace(lastName) || lastName.Length < 2 || lastName.Length > 60)
-            {
-                throw new ArgumentException("Last name must be between 2 and 60 characters and cannot be empty or contain only spaces.");
-            }
-
-            var minDate = DateTime.SpecifyKind(new DateTime(1950, 1, 1), DateTimeKind.Utc);
-            var currentDate = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Local);
-            if (dateOfBirth < minDate || dateOfBirth > currentDate)
-            {
-                throw new ArgumentException("Date of birth must be between 01-Jan-1950 and today's date.");
-            }
-
-            if (height <= 0 || height > 300)
-            {
-                throw new ArgumentException("Height must be a positive value and less than 300 cm.");
-            }
-
-            if (salary <= 0)
-            {
-                throw new ArgumentException("Salary must be a positive value.");
-            }
-
-            if (!"MFN".Contains(gender, StringComparison.Ordinal))
-            {
-                throw new ArgumentException("Gender must be 'M', 'F', or 'N'.");
-            }
+            return this.dateOfBirthDictionary.TryGetValue(dateOfBirth.Date, out var records)
+                ? new ReadOnlyCollection<FileCabinetRecord>(records)
+                : new ReadOnlyCollection<FileCabinetRecord>(new List<FileCabinetRecord>());
         }
 
         private void UpdateDictionaries(FileCabinetRecord record)

@@ -1,4 +1,4 @@
-﻿namespace FileCabinetApp
+﻿namespace FileCabinetApp.Models
 {
     public class FileCabinetRecord
     {

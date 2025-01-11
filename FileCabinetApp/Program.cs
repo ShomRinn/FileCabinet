@@ -1,5 +1,9 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 using System.Globalization;
+using FileCabinetApp.Models;
+using FileCabinetApp.Services;
+using FileCabinetApp.Validators;
 
 namespace FileCabinetApp
 {
@@ -7,62 +11,57 @@ namespace FileCabinetApp
     {
         private const string DeveloperName = "Heorhi Bachyla";
         private const string HintMessage = "Enter your command, or enter 'help' to get help.";
-        private const int CommandHelpIndex = 0;
-        private const int DescriptionHelpIndex = 1;
-        private const int ExplanationHelpIndex = 2;
+        private const string DefaultValidationMessage = "Using default validation rules.";
+        private const string CustomValidationMessage = "Using custom validation rules.";
 
-        private static readonly FileCabinetService fileCabinetService = new FileCabinetService();
+        private static readonly (string Command, Action<string> Action)[] Commands = new (string, Action<string>)[]
+        {
+            ("help", PrintHelp),
+            ("exit", Exit),
+            ("stat", Stat),
+            ("create", Create),
+            ("list", List),
+            ("edit", Edit),
+            ("find", Find),
+        };
+
+        private static FileCabinetService? fileCabinetService;
 
         private static bool isRunning = true;
 
-        private static Tuple<string, Action<string>>[] commands = new Tuple<string, Action<string>>[]
-        {
-            new Tuple<string, Action<string>>("help", PrintHelp),
-            new Tuple<string, Action<string>>("exit", Exit),
-            new Tuple<string, Action<string>>("stat", Stat),
-            new Tuple<string, Action<string>>("create", Create),
-            new Tuple<string, Action<string>>("list", List),
-            new Tuple<string, Action<string>>("edit", Edit),
-            new Tuple<string, Action<string>>("find", Find),
-        };
-
-        private static string[][] helpMessages = new string[][]
-        {
-            new string[] { "help", "prints the help screen", "The 'help' command prints the help screen." },
-            new string[] { "exit", "exits the application", "The 'exit' command exits the application." },
-            new string[] { "stat", "shows the statistics of records", "The 'stat' command shows the number of records." },
-            new string[] { "create", "creates a new record", "The 'create' command creates a new record with personal data." },
-            new string[] { "list", "lists all records", "The 'list' command lists all records in the system." },
-            new string[] { "edit", "edits an existing record", "The 'edit' command modifies an existing record by ID." },
-            new string[] { "find", "finds records by a specific property", "The 'find' command searches records by property (firstname, lastname, dateofbirth)." },
-        };
-
         public static void Main(string[] args)
         {
-            Console.WriteLine($"File Cabinet Application, developed by {Program.DeveloperName}");
-            Console.WriteLine(Program.HintMessage);
+            if (args == null)
+            {
+                throw new ArgumentNullException(nameof(args), "The argument 'args' cannot be null.");
+            }
+
+            SetValidationRules(args);
+
+            Console.WriteLine($"File Cabinet Application, developed by {DeveloperName}");
+            Console.WriteLine(HintMessage);
             Console.WriteLine();
 
             do
             {
                 Console.Write("> ");
                 var line = Console.ReadLine();
-                var inputs = line != null ? line.Split(' ', 2) : new string[] { string.Empty, string.Empty };
+                var inputs = line?.Split(' ', 2) ?? new string[] { string.Empty, string.Empty };
                 const int commandIndex = 0;
                 var command = inputs[commandIndex];
 
                 if (string.IsNullOrEmpty(command))
                 {
-                    Console.WriteLine(Program.HintMessage);
+                    Console.WriteLine(HintMessage);
                     continue;
                 }
 
-                var index = Array.FindIndex(commands, 0, commands.Length, i => i.Item1.Equals(command, StringComparison.OrdinalIgnoreCase));
+                var index = Array.FindIndex(Commands, c => c.Command.Equals(command, StringComparison.OrdinalIgnoreCase));
                 if (index >= 0)
                 {
                     const int parametersIndex = 1;
                     var parameters = inputs.Length > 1 ? inputs[parametersIndex] : string.Empty;
-                    commands[index].Item2(parameters);
+                    Commands[index].Action(parameters);
                 }
                 else
                 {
@@ -70,6 +69,41 @@ namespace FileCabinetApp
                 }
             }
             while (isRunning);
+        }
+
+        private static void SetValidationRules(string[] args)
+        {
+            string validationRules = "DEFAULT";
+
+            foreach (var arg in args)
+            {
+                if (arg.StartsWith("--validation-rules=", StringComparison.OrdinalIgnoreCase))
+                {
+                    validationRules = arg.Substring("--validation-rules=".Length).ToUpperInvariant();
+                }
+                else if (arg.StartsWith("-v", StringComparison.OrdinalIgnoreCase))
+                {
+                    validationRules = arg.Substring(2).ToUpperInvariant();
+                }
+            }
+
+            switch (validationRules)
+            {
+                case "DEFAULT":
+                    Console.WriteLine(DefaultValidationMessage);
+                    fileCabinetService = new FileCabinetService(new DefaultValidator());
+                    break;
+
+                case "CUSTOM":
+                    Console.WriteLine(CustomValidationMessage);
+                    fileCabinetService = new FileCabinetService(new CustomValidator());
+                    break;
+
+                default:
+                    Console.WriteLine($"Unknown validation rules: {validationRules}. Using default rules.");
+                    fileCabinetService = new FileCabinetService(new DefaultValidator());
+                    break;
+            }
         }
 
         private static void PrintMissedCommandInfo(string command)
@@ -80,25 +114,37 @@ namespace FileCabinetApp
 
         private static void PrintHelp(string parameters)
         {
+            var helpMessages = new (string Command, string ShortDescription, string DetailedDescription)[]
+            {
+                ("help", "Displays a list of all available commands. Use 'help <command>' for details about a specific command.", "Displays a list of all available commands. Use 'help <command>' for details about a specific command."),
+                ("exit", "Exits the application", "Terminates the program."),
+                ("stat", "Shows the statistics of records", "Displays the total number of records currently stored in the system."),
+                ("create", "Creates a new record with personal data", "Allows you to add a new record by entering personal details step by step."),
+                ("list", "Lists all records in the system", "Displays all records stored in the system."),
+                ("edit", "Modifies an existing record by ID", "Allows you to update the details of an existing record. Usage: edit <record ID>."),
+                ("find", "Searches records by property", "Searches for records by a specific property (firstname, lastname, or dateofbirth). Usage: find <property> <value>."),
+            };
+
             if (!string.IsNullOrEmpty(parameters))
             {
-                var index = Array.FindIndex(helpMessages, 0, helpMessages.Length, i => string.Equals(i[Program.CommandHelpIndex], parameters, StringComparison.OrdinalIgnoreCase));
-                if (index >= 0)
+                var commandDescription = Array.Find(helpMessages, h => h.Command.Equals(parameters, StringComparison.OrdinalIgnoreCase));
+
+                if (string.IsNullOrEmpty(commandDescription.Command))
                 {
-                    Console.WriteLine(helpMessages[index][Program.ExplanationHelpIndex]);
+                    Console.WriteLine($"There is no explanation for the '{parameters}' command.");
                 }
                 else
                 {
-                    Console.WriteLine($"There is no explanation for '{parameters}' command.");
+                    Console.WriteLine($"{commandDescription.Command} - {commandDescription.ShortDescription}");
+                    Console.WriteLine($"Details: {commandDescription.DetailedDescription}");
                 }
             }
             else
             {
                 Console.WriteLine("Available commands:");
-
-                foreach (var helpMessage in helpMessages)
+                foreach (var (command, shortDescription, _) in helpMessages)
                 {
-                    Console.WriteLine("\t{0}\t- {1}", helpMessage[Program.CommandHelpIndex], helpMessage[Program.DescriptionHelpIndex]);
+                    Console.WriteLine($"\t{command} - {shortDescription}");
                 }
             }
 
@@ -107,19 +153,19 @@ namespace FileCabinetApp
 
         private static void Exit(string parameters)
         {
-            Console.WriteLine("Exiting an application...");
+            Console.WriteLine("Exiting the application...");
             isRunning = false;
         }
 
         private static void Stat(string parameters)
         {
-            var recordsCount = fileCabinetService.GetStat();
-            Console.WriteLine($"{recordsCount} record(s).");
+            var count = fileCabinetService?.GetStat() ?? 0;
+            Console.WriteLine($"{count} record(s).");
         }
 
         private static void Create(string parameters)
         {
-            string firstName = string.Empty, lastName = string.Empty;
+            string firstName, lastName;
             DateTime dateOfBirth;
             short height;
             decimal salary;
@@ -131,69 +177,60 @@ namespace FileCabinetApp
                 {
                     Console.Write("First name: ");
                     firstName = Console.ReadLine() ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(firstName) || firstName.Length < 2 || firstName.Length > 60)
-                    {
-                        throw new ArgumentException("First name must be between 2 and 60 characters and cannot be empty or whitespace.");
-                    }
 
                     Console.Write("Last name: ");
                     lastName = Console.ReadLine() ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(lastName) || lastName.Length < 2 || lastName.Length > 60)
-                    {
-                        throw new ArgumentException("Last name must be between 2 and 60 characters and cannot be empty or whitespace.");
-                    }
 
                     Console.Write("Date of birth (MM/DD/YYYY): ");
-                    var dateInput = Console.ReadLine() ?? string.Empty;
-                    dateOfBirth = DateTime.Parse(dateInput, CultureInfo.InvariantCulture);
+                    if (!DateTime.TryParse(Console.ReadLine(), out dateOfBirth))
+                    {
+                        Console.WriteLine("Invalid date format.");
+                        continue;
+                    }
 
                     Console.Write("Height (cm): ");
-                    if (!short.TryParse(Console.ReadLine() ?? string.Empty, out height) || height <= 0 || height > 300)
+                    if (!short.TryParse(Console.ReadLine(), out height))
                     {
-                        throw new ArgumentException("Height must be a positive number and less than 300 cm.");
+                        Console.WriteLine("Invalid height format.");
+                        continue;
                     }
 
                     Console.Write("Salary: ");
-                    if (!decimal.TryParse(Console.ReadLine() ?? string.Empty, out salary) || salary <= 0)
+                    if (!decimal.TryParse(Console.ReadLine(), out salary))
                     {
-                        throw new ArgumentException("Salary must be a positive number.");
+                        Console.WriteLine("Invalid salary format.");
+                        continue;
                     }
 
                     Console.Write("Gender (M/F/N): ");
-                    var genderInput = Console.ReadLine() ?? string.Empty;
+                    string genderInput = Console.ReadLine() ?? string.Empty;
                     if (string.IsNullOrWhiteSpace(genderInput) || genderInput.Length != 1)
                     {
-                        throw new ArgumentException("Gender must be a single character: 'M', 'F', or 'N'.");
+                        Console.WriteLine("Invalid gender format.");
+                        continue;
                     }
 
                     gender = char.ToUpper(genderInput[0], CultureInfo.InvariantCulture);
-
-                    var recordId = fileCabinetService.CreateRecord(firstName, lastName, dateOfBirth, height, salary, gender);
+                    var recordId = fileCabinetService?.CreateRecord(firstName, lastName, dateOfBirth, height, salary, gender);
                     Console.WriteLine($"Record #{recordId} is created.");
                     break;
                 }
-                catch (FormatException ex)
-                {
-                    Console.WriteLine($"Input format error: {ex.Message}");
-                }
-                catch (OverflowException ex)
-                {
-                    Console.WriteLine($"Input value is too large or too small: {ex.Message}");
-                }
-                catch (ArgumentException ex)
-                {
-                    Console.WriteLine($"Validation error: {ex.Message}");
-                }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Unexpected error: {ex.Message}");
+                    Console.WriteLine($"Error: {ex.Message}");
                 }
             }
         }
 
         private static void List(string parameters)
         {
-            var records = fileCabinetService.GetRecords();
+            var records = fileCabinetService?.GetRecords();
+
+            if (records == null || records.Count == 0)
+            {
+                Console.WriteLine("No records found.");
+                return;
+            }
 
             foreach (var record in records)
             {
@@ -203,15 +240,9 @@ namespace FileCabinetApp
 
         private static void Edit(string parameters)
         {
-            if (string.IsNullOrWhiteSpace(parameters))
-            {
-                Console.WriteLine("You must specify the ID of the record to edit.");
-                return;
-            }
-
             if (!int.TryParse(parameters, out int id) || id <= 0)
             {
-                Console.WriteLine("Invalid ID. Please enter a positive integer.");
+                Console.WriteLine("Invalid ID.");
                 return;
             }
 
@@ -226,40 +257,39 @@ namespace FileCabinetApp
                 Console.Write("Date of birth (MM/DD/YYYY): ");
                 if (!DateTime.TryParse(Console.ReadLine(), out DateTime dateOfBirth))
                 {
-                    throw new ArgumentException("Invalid date format.");
+                    Console.WriteLine("Invalid date format.");
+                    return;
                 }
 
                 Console.Write("Height (cm): ");
-                if (!short.TryParse(Console.ReadLine(), out short height) || height <= 0 || height > 300)
+                if (!short.TryParse(Console.ReadLine(), out short height))
                 {
-                    throw new ArgumentException("Height must be a positive number and less than 300 cm.");
+                    Console.WriteLine("Invalid height format.");
+                    return;
                 }
 
                 Console.Write("Salary: ");
-                if (!decimal.TryParse(Console.ReadLine(), out decimal salary) || salary <= 0)
+                if (!decimal.TryParse(Console.ReadLine(), out decimal salary))
                 {
-                    throw new ArgumentException("Salary must be a positive number.");
+                    Console.WriteLine("Invalid salary format.");
+                    return;
                 }
 
                 Console.Write("Gender (M/F/N): ");
                 string genderInput = Console.ReadLine() ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(genderInput) || genderInput.Length != 1)
                 {
-                    throw new ArgumentException("Gender must be a single character: 'M', 'F', or 'N'.");
+                    Console.WriteLine("Invalid gender format.");
+                    return;
                 }
 
                 char gender = char.ToUpper(genderInput[0], CultureInfo.InvariantCulture);
-
-                fileCabinetService.EditRecord(id, firstName, lastName, dateOfBirth, height, salary, gender);
+                fileCabinetService?.EditRecord(id, firstName, lastName, dateOfBirth, height, salary, gender);
                 Console.WriteLine($"Record #{id} is updated.");
-            }
-            catch (ArgumentException ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error: {ex.Message}");
+                Console.WriteLine($"Error: {ex.Message}");
             }
         }
 
@@ -272,40 +302,20 @@ namespace FileCabinetApp
                 return;
             }
 
-            string property = inputs[0].ToLowerInvariant();
-            string value = inputs[1].Trim('"').Trim(); // Удаляем кавычки и пробелы
+            string property = inputs[0].ToUpperInvariant();
+            string value = inputs[1].Trim('"').Trim();
 
-            FileCabinetRecord[] results;
-
-            switch (property)
+            ReadOnlyCollection<FileCabinetRecord> results = property switch
             {
-                case "firstname":
-                    results = fileCabinetService.FindByFirstName(value);
-                    break;
+                "FIRSTNAME" => fileCabinetService?.FindByFirstName(value) ?? new List<FileCabinetRecord>().AsReadOnly(),
+                "LASTNAME" => fileCabinetService?.FindByLastName(value) ?? new List<FileCabinetRecord>().AsReadOnly(),
+                "DATEOFBIRTH" => DateTime.TryParse(value, out DateTime dateOfBirth)
+                    ? fileCabinetService?.FindByDateOfBirth(dateOfBirth) ?? new List<FileCabinetRecord>().AsReadOnly()
+                    : new List<FileCabinetRecord>().AsReadOnly(),
+                _ => new List<FileCabinetRecord>().AsReadOnly()
+            };
 
-                case "lastname":
-                    results = fileCabinetService.FindByLastName(value);
-                    break;
-
-                case "dateofbirth":
-                    if (DateTime.TryParse(value, out DateTime dateOfBirth))
-                    {
-                        results = fileCabinetService.FindByDateOfBirth(dateOfBirth);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Invalid date format. Use: MM/DD/YYYY.");
-                        return;
-                    }
-
-                    break;
-
-                default:
-                    Console.WriteLine($"Unknown property '{property}'. Available properties: firstname, lastname, dateofbirth.");
-                    return;
-            }
-
-            if (results.Length == 0)
+            if (results.Count == 0)
             {
                 Console.WriteLine("No records found.");
                 return;
@@ -314,7 +324,7 @@ namespace FileCabinetApp
             PrintRecords(results);
         }
 
-        private static void PrintRecords(FileCabinetRecord[] records)
+        private static void PrintRecords(IReadOnlyCollection<FileCabinetRecord> records)
         {
             foreach (var record in records)
             {
