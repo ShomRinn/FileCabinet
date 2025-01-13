@@ -104,6 +104,11 @@ namespace FileCabinetApp.Services
                 : new ReadOnlyCollection<FileCabinetRecord>(new List<FileCabinetRecord>());
         }
 
+        public FileCabinetServiceSnapshot MakeSnapshot()
+        {
+            return new FileCabinetServiceSnapshot(new ReadOnlyCollection<FileCabinetRecord>(this.list));
+        }
+
         private void UpdateDictionaries(FileCabinetRecord record)
         {
             if (!this.firstNameDictionary.TryGetValue(record.FirstName, out var firstNameRecords))

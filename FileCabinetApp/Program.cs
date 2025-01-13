@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Xml;
 using FileCabinetApp.Models;
 using FileCabinetApp.Services;
 using FileCabinetApp.Validators;
@@ -23,6 +24,7 @@ namespace FileCabinetApp
             ("list", List),
             ("edit", Edit),
             ("find", Find),
+            ("export", Export),
         };
 
         private static FileCabinetService? fileCabinetService;
@@ -123,6 +125,7 @@ namespace FileCabinetApp
                 ("list", "Lists all records in the system", "Displays all records stored in the system."),
                 ("edit", "Modifies an existing record by ID", "Allows you to update the details of an existing record. Usage: edit <record ID>."),
                 ("find", "Searches records by property", "Searches for records by a specific property (firstname, lastname, or dateofbirth). Usage: find <property> <value>."),
+                ("export", "Exports records to a file.", "Exports all records to a specified file in CSV or XML format. Usage: export <csv/xml> <file path>."),
             };
 
             if (!string.IsNullOrEmpty(parameters))
@@ -329,6 +332,57 @@ namespace FileCabinetApp
             foreach (var record in records)
             {
                 Console.WriteLine($"#{record.Id}, {record.FirstName}, {record.LastName}, {record.DateOfBirth:yyyy-MMM-dd}, {record.Height} cm, {record.Salary:C}, {record.Gender}");
+            }
+        }
+
+        private static void Export(string parameters)
+        {
+            var inputs = parameters.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (inputs.Length != 2)
+            {
+                Console.WriteLine("Invalid command format. Usage: export <csv|xml> <filename>");
+                return;
+            }
+
+            var format = inputs[0].ToUpperInvariant();
+            var fileName = inputs[1];
+
+            if (string.IsNullOrEmpty(fileName))
+            {
+                Console.WriteLine("File name is missing.");
+                return;
+            }
+
+            try
+            {
+                using var streamWriter = new StreamWriter(fileName, false);
+                var snapshot = fileCabinetService?.MakeSnapshot();
+
+                switch (format)
+                {
+                    case "CSV":
+                        {
+                            snapshot?.SaveToCsv(streamWriter);
+                            Console.WriteLine($"All records are exported to file {fileName}.");
+                            break;
+                        }
+
+                    case "XML":
+                        {
+                            using var xmlWriter = XmlWriter.Create(streamWriter, new XmlWriterSettings { Indent = true });
+                            snapshot?.SaveToXml(xmlWriter);
+                            Console.WriteLine($"All records are exported to file {fileName}.");
+                            break;
+                        }
+
+                    default:
+                        Console.WriteLine($"Unsupported export format: {format}");
+                        break;
+                }
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"Export failed: {ex.Message}");
             }
         }
     }
