@@ -185,7 +185,7 @@ namespace FileCabinetApp
                     lastName = Console.ReadLine() ?? string.Empty;
 
                     Console.Write("Date of birth (MM/DD/YYYY): ");
-                    if (!DateTime.TryParse(Console.ReadLine(), out dateOfBirth))
+                    if (!DateTime.TryParse(Console.ReadLine(), CultureInfo.InvariantCulture, DateTimeStyles.None, out dateOfBirth))
                     {
                         Console.WriteLine("Invalid date format.");
                         continue;
@@ -258,7 +258,7 @@ namespace FileCabinetApp
                 string lastName = Console.ReadLine() ?? string.Empty;
 
                 Console.Write("Date of birth (MM/DD/YYYY): ");
-                if (!DateTime.TryParse(Console.ReadLine(), out DateTime dateOfBirth))
+                if (!DateTime.TryParse(Console.ReadLine(), CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dateOfBirth))
                 {
                     Console.WriteLine("Invalid date format.");
                     return;
@@ -308,11 +308,11 @@ namespace FileCabinetApp
             string property = inputs[0].ToUpperInvariant();
             string value = inputs[1].Trim('"').Trim();
 
-            ReadOnlyCollection<FileCabinetRecord> results = property switch
+            ReadOnlyCollection<FileCabinetRecord> results = property.ToUpperInvariant() switch
             {
                 "FIRSTNAME" => fileCabinetService?.FindByFirstName(value) ?? new List<FileCabinetRecord>().AsReadOnly(),
                 "LASTNAME" => fileCabinetService?.FindByLastName(value) ?? new List<FileCabinetRecord>().AsReadOnly(),
-                "DATEOFBIRTH" => DateTime.TryParse(value, out DateTime dateOfBirth)
+                "DATEOFBIRTH" => DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dateOfBirth)
                     ? fileCabinetService?.FindByDateOfBirth(dateOfBirth) ?? new List<FileCabinetRecord>().AsReadOnly()
                     : new List<FileCabinetRecord>().AsReadOnly(),
                 _ => new List<FileCabinetRecord>().AsReadOnly()

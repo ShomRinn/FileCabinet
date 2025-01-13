@@ -17,7 +17,7 @@ namespace FileCabinetApp.Validators
                 throw new ArgumentException("Last name must be between 3 and 50 characters.");
             }
 
-            var minDate = new DateTime(1960, 1, 1);
+            DateTime minDate = new DateTime(1960, 1, 1, 0, 0, 0, DateTimeKind.Utc);
             if (record.DateOfBirth < minDate || record.DateOfBirth > DateTime.Now.AddYears(-18))
             {
                 throw new ArgumentException("Date of birth must be between 01-Jan-1960 and at least 18 years ago.");
