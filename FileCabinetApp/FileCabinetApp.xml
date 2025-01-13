@@ -4,5 +4,17 @@
         <name>FileCabinetApp</name>
     </assembly>
     <members>
+        <member name="M:FileCabinetApp.Services.FileCabinetServiceSnapshot.SaveToCsv(System.IO.StreamWriter)">
+            <summary>
+            Saves records to CSV format.
+            </summary>
+            <param name="writer">StreamWriter to write the data.</param>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetServiceSnapshot.SaveToXml(System.Xml.XmlWriter)">
+            <summary>
+            Saves records to XML format.
+            </summary>
+            <param name="writer">XmlWriter to write the data.</param>
+        </member>
     </members>
 </doc>
