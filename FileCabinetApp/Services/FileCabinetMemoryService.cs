@@ -9,11 +9,11 @@ namespace FileCabinetApp.Services
 {
     public class FileCabinetMemoryService : IFileCabinetService
     {
-        private readonly List<FileCabinetRecord> list = new();
+        private readonly List<FileCabinetRecord> list = new ();
         private readonly IRecordValidator validator;
-        private readonly Dictionary<string, List<FileCabinetRecord>> firstNameDictionary = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, List<FileCabinetRecord>> lastNameDictionary = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<DateTime, List<FileCabinetRecord>> dateOfBirthDictionary = new();
+        private readonly Dictionary<string, List<FileCabinetRecord>> firstNameDictionary = new (StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<FileCabinetRecord>> lastNameDictionary = new (StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<DateTime, List<FileCabinetRecord>> dateOfBirthDictionary = new ();
 
         public FileCabinetMemoryService(IRecordValidator validator)
         {

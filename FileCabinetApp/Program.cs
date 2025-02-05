@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Xml;
 using FileCabinetApp.Models;
 using FileCabinetApp.Services;
@@ -15,6 +16,12 @@ namespace FileCabinetApp
         private const string DefaultValidationMessage = "Using default validation rules.";
         private const string CustomValidationMessage = "Using custom validation rules.";
 
+        private static string storageType = "memory";
+
+        private static IFileCabinetService? fileCabinetService;
+
+        private static bool isRunning = true;
+
         private static readonly (string Command, Action<string> Action)[] Commands = new (string, Action<string>)[]
         {
             ("help", PrintHelp),
@@ -27,10 +34,6 @@ namespace FileCabinetApp
             ("export", Export),
         };
 
-        private static FileCabinetMemoryService? fileCabinetService;
-
-        private static bool isRunning = true;
-
         public static void Main(string[] args)
         {
             if (args == null)
@@ -38,6 +41,10 @@ namespace FileCabinetApp
                 throw new ArgumentNullException(nameof(args), "The argument 'args' cannot be null.");
             }
 
+            // 1. Разбираем, какой тип хранения выбрал пользователь (--storage/-s).
+            SetStorageType(args);
+
+            // 2. Разбираем, какие правила валидации выбрать (--validation-rules или -v).
             SetValidationRules(args);
 
             Console.WriteLine($"File Cabinet Application, developed by {DeveloperName}");
@@ -73,6 +80,30 @@ namespace FileCabinetApp
             while (isRunning);
         }
 
+        /// <summary>
+        /// Устанавливает тип хранения (memory/file) на основе параметров командной строки.
+        /// </summary>
+        /// <param name="args">Аргументы командной строки.</param>
+        private static void SetStorageType(string[] args)
+        {
+            foreach (var arg in args)
+            {
+                if (arg.StartsWith("--storage=", StringComparison.OrdinalIgnoreCase))
+                {
+                    storageType = arg.Substring("--storage=".Length).ToLowerInvariant();
+                }
+                else if (arg.StartsWith("-s", StringComparison.OrdinalIgnoreCase))
+                {
+                    storageType = arg.Substring(2).ToLowerInvariant();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Устанавливает правила валидации (default/custom) и создаёт соответствующий сервис,
+        /// учитывая выбранный тип хранилища (memory/file).
+        /// </summary>
+        /// <param name="args">Аргументы командной строки.</param>
         private static void SetValidationRules(string[] args)
         {
             string validationRules = "DEFAULT";
@@ -89,21 +120,33 @@ namespace FileCabinetApp
                 }
             }
 
-            switch (validationRules)
+            IRecordValidator validator = validationRules switch
             {
-                case "DEFAULT":
-                    Console.WriteLine(DefaultValidationMessage);
-                    fileCabinetService = new FileCabinetMemoryService(new DefaultValidator());
+                "DEFAULT" => new DefaultValidator(),
+                "CUSTOM" => new CustomValidator(),
+                _ => new DefaultValidator(),
+            };
+
+            if (validationRules != "DEFAULT" && validationRules != "CUSTOM")
+            {
+                Console.WriteLine($"Unknown validation rules: {validationRules}. Using default rules.");
+            }
+
+            Console.WriteLine(validationRules == "CUSTOM" ? CustomValidationMessage : DefaultValidationMessage);
+
+            // Теперь, в зависимости от storageType, инициализируем сервис
+            switch (storageType)
+            {
+                case "file":
+                    Console.WriteLine("Using file system storage.");
+                    var fileStream = new FileStream("cabinet-records.db", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                    fileCabinetService = new FileCabinetFilesystemService(fileStream, validator);
                     break;
 
-                case "CUSTOM":
-                    Console.WriteLine(CustomValidationMessage);
-                    fileCabinetService = new FileCabinetMemoryService(new CustomValidator());
-                    break;
-
+                case "memory":
                 default:
-                    Console.WriteLine($"Unknown validation rules: {validationRules}. Using default rules.");
-                    fileCabinetService = new FileCabinetMemoryService(new DefaultValidator());
+                    Console.WriteLine("Using memory storage.");
+                    fileCabinetService = new FileCabinetMemoryService(validator);
                     break;
             }
         }
@@ -168,6 +211,12 @@ namespace FileCabinetApp
 
         private static void Create(string parameters)
         {
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
             string firstName, lastName;
             DateTime dateOfBirth;
             short height;
@@ -214,7 +263,7 @@ namespace FileCabinetApp
                     }
 
                     gender = char.ToUpper(genderInput[0], CultureInfo.InvariantCulture);
-                    var recordId = fileCabinetService?.CreateRecord(firstName, lastName, dateOfBirth, height, salary, gender);
+                    var recordId = fileCabinetService.CreateRecord(firstName, lastName, dateOfBirth, height, salary, gender);
                     Console.WriteLine($"Record #{recordId} is created.");
                     break;
                 }
@@ -227,7 +276,13 @@ namespace FileCabinetApp
 
         private static void List(string parameters)
         {
-            var records = fileCabinetService?.GetRecords();
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
+            var records = fileCabinetService.GetRecords();
 
             if (records == null || records.Count == 0)
             {
@@ -243,6 +298,12 @@ namespace FileCabinetApp
 
         private static void Edit(string parameters)
         {
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
             if (!int.TryParse(parameters, out int id) || id <= 0)
             {
                 Console.WriteLine("Invalid ID.");
@@ -287,7 +348,7 @@ namespace FileCabinetApp
                 }
 
                 char gender = char.ToUpper(genderInput[0], CultureInfo.InvariantCulture);
-                fileCabinetService?.EditRecord(id, firstName, lastName, dateOfBirth, height, salary, gender);
+                fileCabinetService.EditRecord(id, firstName, lastName, dateOfBirth, height, salary, gender);
                 Console.WriteLine($"Record #{id} is updated.");
             }
             catch (Exception ex)
@@ -298,6 +359,12 @@ namespace FileCabinetApp
 
         private static void Find(string parameters)
         {
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
             var inputs = parameters.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             if (inputs.Length != 2)
             {
@@ -308,14 +375,14 @@ namespace FileCabinetApp
             string property = inputs[0].ToUpperInvariant();
             string value = inputs[1].Trim('"').Trim();
 
-            ReadOnlyCollection<FileCabinetRecord> results = property.ToUpperInvariant() switch
+            ReadOnlyCollection<FileCabinetRecord> results = property switch
             {
-                "FIRSTNAME" => fileCabinetService?.FindByFirstName(value) ?? new List<FileCabinetRecord>().AsReadOnly(),
-                "LASTNAME" => fileCabinetService?.FindByLastName(value) ?? new List<FileCabinetRecord>().AsReadOnly(),
+                "FIRSTNAME" => fileCabinetService.FindByFirstName(value),
+                "LASTNAME" => fileCabinetService.FindByLastName(value),
                 "DATEOFBIRTH" => DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dateOfBirth)
-                    ? fileCabinetService?.FindByDateOfBirth(dateOfBirth) ?? new List<FileCabinetRecord>().AsReadOnly()
-                    : new List<FileCabinetRecord>().AsReadOnly(),
-                _ => new List<FileCabinetRecord>().AsReadOnly()
+                    ? fileCabinetService.FindByDateOfBirth(dateOfBirth)
+                    : new ReadOnlyCollection<FileCabinetRecord>(Array.Empty<FileCabinetRecord>()),
+                _ => new ReadOnlyCollection<FileCabinetRecord>(Array.Empty<FileCabinetRecord>()),
             };
 
             if (results.Count == 0)
@@ -337,6 +404,12 @@ namespace FileCabinetApp
 
         private static void Export(string parameters)
         {
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
             var inputs = parameters.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
             if (inputs.Length != 2)
             {
@@ -356,24 +429,23 @@ namespace FileCabinetApp
             try
             {
                 using var streamWriter = new StreamWriter(fileName, false);
-                var snapshot = fileCabinetService?.MakeSnapshot();
+                var snapshot = fileCabinetService.MakeSnapshot();
 
                 switch (format)
                 {
                     case "CSV":
-                        {
-                            snapshot?.SaveToCsv(streamWriter);
-                            Console.WriteLine($"All records are exported to file {fileName}.");
-                            break;
-                        }
+                        snapshot.SaveToCsv(streamWriter);
+                        Console.WriteLine($"All records are exported to file {fileName}.");
+                        break;
 
                     case "XML":
+                        using (var xmlWriter = XmlWriter.Create(streamWriter, new XmlWriterSettings { Indent = true }))
                         {
-                            using var xmlWriter = XmlWriter.Create(streamWriter, new XmlWriterSettings { Indent = true });
-                            snapshot?.SaveToXml(xmlWriter);
-                            Console.WriteLine($"All records are exported to file {fileName}.");
-                            break;
+                            snapshot.SaveToXml(xmlWriter);
                         }
+
+                        Console.WriteLine($"All records are exported to file {fileName}.");
+                        break;
 
                     default:
                         Console.WriteLine($"Unsupported export format: {format}");

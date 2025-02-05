@@ -4,6 +4,94 @@
         <name>FileCabinetApp</name>
     </assembly>
     <members>
+        <member name="M:FileCabinetApp.Program.SetStorageType(System.String[])">
+            <summary>
+            Устанавливает тип хранения (memory/file) на основе параметров командной строки.
+            </summary>
+            <param name="args">Аргументы командной строки.</param>
+        </member>
+        <member name="M:FileCabinetApp.Program.SetValidationRules(System.String[])">
+            <summary>
+            Устанавливает правила валидации (default/custom) и создаёт соответствующий сервис,
+            учитывая выбранный тип хранилища (memory/file).
+            </summary>
+            <param name="args">Аргументы командной строки.</param>
+        </member>
+        <member name="T:FileCabinetApp.Services.FileCabinetFilesystemService">
+            <summary>
+            Provides file-based storage for FileCabinet records.
+            </summary>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.#ctor(System.IO.FileStream,FileCabinetApp.Validators.IRecordValidator)">
+            <summary>
+            Initializes a new instance of the <see cref="T:FileCabinetApp.Services.FileCabinetFilesystemService"/> class.
+            </summary>
+            <param name="fileStream">The file stream.</param>
+            <param name="validator">The record validator.</param>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.CreateRecord(System.String,System.String,System.DateTime,System.Int16,System.Decimal,System.Char)">
+            <summary>
+            Creates a new record in the file storage.
+            </summary>
+            <param name="firstName">The first name.</param>
+            <param name="lastName">The last name.</param>
+            <param name="dateOfBirth">The date of birth.</param>
+            <param name="height">The height.</param>
+            <param name="salary">The salary.</param>
+            <param name="gender">The gender.</param>
+            <returns>The ID of the new record.</returns>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.GetRecords">
+            <summary>
+            Returns all active records from the file.
+            </summary>
+            <returns>A read-only collection of active records.</returns>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.GetStat">
+            <summary>
+            Returns the number of active records in the file.
+            </summary>
+            <returns>The count of active records.</returns>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.EditRecord(System.Int32,System.String,System.String,System.DateTime,System.Int16,System.Decimal,System.Char)">
+            <summary>
+            Updates an existing record in the file.
+            </summary>
+            <param name="id">The record ID to update.</param>
+            <param name="firstName">The new first name.</param>
+            <param name="lastName">The new last name.</param>
+            <param name="dateOfBirth">The new date of birth.</param>
+            <param name="height">The new height.</param>
+            <param name="salary">The new salary.</param>
+            <param name="gender">The new gender.</param>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.FindByFirstName(System.String)">
+            <summary>
+            Finds records by first name.
+            </summary>
+            <param name="firstName">The first name to search for.</param>
+            <returns>A read-only collection of matching records.</returns>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.FindByLastName(System.String)">
+            <summary>
+            Finds records by last name.
+            </summary>
+            <param name="lastName">The last name to search for.</param>
+            <returns>A read-only collection of matching records.</returns>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.FindByDateOfBirth(System.DateTime)">
+            <summary>
+            Finds records by date of birth.
+            </summary>
+            <param name="dateOfBirth">The date of birth to search for.</param>
+            <returns>A read-only collection of matching records.</returns>
+        </member>
+        <member name="M:FileCabinetApp.Services.FileCabinetFilesystemService.MakeSnapshot">
+            <summary>
+            Creates a snapshot of current data.
+            </summary>
+            <returns>The service snapshot.</returns>
+        </member>
         <member name="M:FileCabinetApp.Services.FileCabinetServiceSnapshot.SaveToCsv(System.IO.StreamWriter)">
             <summary>
             Saves records to CSV format.
