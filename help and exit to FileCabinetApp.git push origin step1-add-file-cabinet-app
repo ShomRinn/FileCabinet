@@ -1,0 +1,105 @@
+[1mdiff --git a/FileCabinetApp/Program.cs b/FileCabinetApp/Program.cs[m
+[1mnew file mode 100644[m
+[1mindex 0000000..9854b2d[m
+[1m--- /dev/null[m
+[1m+++ b/FileCabinetApp/Program.cs[m
+[36m@@ -0,0 +1,99 @@[m
+[32m+[m[32m﻿namespace FileCabinetApp[m
+[32m+[m[32m{[m
+[32m+[m[32m    public static class Program[m
+[32m+[m[32m    {[m
+[32m+[m[32m        private const string DeveloperName = "Heorhi Bachyla";[m
+[32m+[m[32m        private const string HintMessage = "Enter your command, or enter 'help' to get help.";[m
+[32m+[m[32m        private const int CommandHelpIndex = 0;[m
+[32m+[m[32m        private const int DescriptionHelpIndex = 1;[m
+[32m+[m[32m        private const int ExplanationHelpIndex = 2;[m
+[32m+[m
+[32m+[m[32m        private static bool isRunning = true;[m
+[32m+[m
+[32m+[m[32m        private static Tuple<string, Action<string>>[] commands = new Tuple<string, Action<string>>[][m
+[32m+[m[32m        {[m
+[32m+[m[32m            new Tuple<string, Action<string>>("help", PrintHelp),[m
+[32m+[m[32m            new Tuple<string, Action<string>>("exit", Exit),[m
+[32m+[m[32m        };[m
+[32m+[m
+[32m+[m[32m        private static string[][] helpMessages = new string[][][m
+[32m+[m[32m        {[m
+[32m+[m[32m            new string[] { "help", "prints the help screen", "The 'help' command prints the help screen." },[m
+[32m+[m[32m            new string[] { "exit", "exits the application", "The 'exit' command exits the application." },[m
+[32m+[m[32m        };[m
+[32m+[m
+[32m+[m[32m        public static void Main(string[] args)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            Console.WriteLine($"File Cabinet Application, developed by {Program.DeveloperName}");[m
+[32m+[m[32m            Console.WriteLine(Program.HintMessage);[m
+[32m+[m[32m            Console.WriteLine();[m
+[32m+[m
+[32m+[m[32m            do[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Console.Write("> ");[m
+[32m+[m[32m                var line = Console.ReadLine();[m
+[32m+[m[32m                var inputs = line != null ? line.Split(' ', 2) : new string[] { string.Empty, string.Empty };[m
+[32m+[m[32m                const int commandIndex = 0;[m
+[32m+[m[32m                var command = inputs[commandIndex];[m
+[32m+[m
+[32m+[m[32m                if (string.IsNullOrEmpty(command))[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Console.WriteLine(Program.HintMessage);[m
+[32m+[m[32m                    continue;[m
+[32m+[m[32m                }[m
+[32m+[m
+[32m+[m[32m                var index = Array.FindIndex(commands, 0, commands.Length, i => i.Item1.Equals(command, StringComparison.InvariantCultureIgnoreCase));[m
+[32m+[m[32m                if (index >= 0)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    const int parametersIndex = 1;[m
+[32m+[m[32m                    var parameters = inputs.Length > 1 ? inputs[parametersIndex] : string.Empty;[m
+[32m+[m[32m                    commands[index].Item2(parameters);[m
+[32m+[m[32m                }[m
+[32m+[m[32m                else[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    PrintMissedCommandInfo(command);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m[32m            while (isRunning);[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        private static void PrintMissedCommandInfo(string command)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            Console.WriteLine($"There is no '{command}' command.");[m
+[32m+[m[32m            Console.WriteLine();[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        private static void PrintHelp(string parameters)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            if (!string.IsNullOrEmpty(parameters))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                var index = Array.FindIndex(helpMessages, 0, helpMessages.Length, i => string.Equals(i[Program.CommandHelpIndex], parameters, StringComparison.InvariantCultureIgnoreCase));[m
+[32m+[m[32m                if (index >= 0)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Console.WriteLine(helpMessages[index][Program.ExplanationHelpIndex]);[m
+[32m+[m[32m                }[m
+[32m+[m[32m                else[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Console.WriteLine($"There is no explanation for '{parameters}' command.");[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m[32m            else[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Console.WriteLine("Available commands:");[m
+[32m+[m
+[32m+[m[32m                foreach (var helpMessage in helpMessages)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Console.WriteLine("\t{0}\t- {1}", helpMessage[Program.CommandHelpIndex], helpMessage[Program.DescriptionHelpIndex]);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            Console.WriteLine();[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        private static void Exit(string parameters)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            Console.WriteLine("Exiting an application...");[m
+[32m+[m[32m            isRunning = false;[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m

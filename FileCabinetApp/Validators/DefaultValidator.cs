@@ -17,7 +17,7 @@ namespace FileCabinetApp.Validators
                 throw new ArgumentException("Last name must be between 2 and 60 characters.");
             }
 
-            var minDate = new DateTime(1950, 1, 1);
+            DateTime minDate = new DateTime(1950, 1, 1, 0, 0, 0, DateTimeKind.Utc);
             if (record.DateOfBirth < minDate || record.DateOfBirth > DateTime.Now)
             {
                 throw new ArgumentException("Date of birth must be between 01-Jan-1950 and today.");

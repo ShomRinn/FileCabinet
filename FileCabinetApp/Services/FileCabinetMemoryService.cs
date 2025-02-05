@@ -7,20 +7,26 @@ using FileCabinetApp.Validators;
 
 namespace FileCabinetApp.Services
 {
-    public class FileCabinetService
+    public class FileCabinetMemoryService : IFileCabinetService
     {
-        private readonly List<FileCabinetRecord> list = new ();
+        private readonly List<FileCabinetRecord> list = new();
         private readonly IRecordValidator validator;
-        private readonly Dictionary<string, List<FileCabinetRecord>> firstNameDictionary = new (StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, List<FileCabinetRecord>> lastNameDictionary = new (StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<DateTime, List<FileCabinetRecord>> dateOfBirthDictionary = new ();
+        private readonly Dictionary<string, List<FileCabinetRecord>> firstNameDictionary = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<FileCabinetRecord>> lastNameDictionary = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<DateTime, List<FileCabinetRecord>> dateOfBirthDictionary = new();
 
-        public FileCabinetService(IRecordValidator validator)
+        public FileCabinetMemoryService(IRecordValidator validator)
         {
             this.validator = validator ?? throw new ArgumentNullException(nameof(validator));
         }
 
-        public int CreateRecord(string firstName, string lastName, DateTime dateOfBirth, short height, decimal salary, char gender)
+        public int CreateRecord(
+            string firstName,
+            string lastName,
+            DateTime dateOfBirth,
+            short height,
+            decimal salary,
+            char gender)
         {
             var record = new FileCabinetRecord
             {
@@ -40,17 +46,14 @@ namespace FileCabinetApp.Services
             return record.Id;
         }
 
-        public ReadOnlyCollection<FileCabinetRecord> GetRecords()
-        {
-            return this.list.AsReadOnly();
-        }
-
-        public int GetStat()
-        {
-            return this.list.Count;
-        }
-
-        public void EditRecord(int id, string firstName, string lastName, DateTime dateOfBirth, short height, decimal salary, char gender)
+        public void EditRecord(
+            int id,
+            string firstName,
+            string lastName,
+            DateTime dateOfBirth,
+            short height,
+            decimal salary,
+            char gender)
         {
             var record = this.list.Find(r => r.Id == id);
             if (record == null)
@@ -81,6 +84,16 @@ namespace FileCabinetApp.Services
             record.Gender = updatedRecord.Gender;
 
             this.UpdateDictionaries(record);
+        }
+
+        public ReadOnlyCollection<FileCabinetRecord> GetRecords()
+        {
+            return this.list.AsReadOnly();
+        }
+
+        public int GetStat()
+        {
+            return this.list.Count;
         }
 
         public ReadOnlyCollection<FileCabinetRecord> FindByFirstName(string firstName)

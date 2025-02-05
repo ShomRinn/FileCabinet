@@ -27,7 +27,7 @@ namespace FileCabinetApp
             ("export", Export),
         };
 
-        private static FileCabinetService? fileCabinetService;
+        private static FileCabinetMemoryService? fileCabinetService;
 
         private static bool isRunning = true;
 
@@ -93,17 +93,17 @@ namespace FileCabinetApp
             {
                 case "DEFAULT":
                     Console.WriteLine(DefaultValidationMessage);
-                    fileCabinetService = new FileCabinetService(new DefaultValidator());
+                    fileCabinetService = new FileCabinetMemoryService(new DefaultValidator());
                     break;
 
                 case "CUSTOM":
                     Console.WriteLine(CustomValidationMessage);
-                    fileCabinetService = new FileCabinetService(new CustomValidator());
+                    fileCabinetService = new FileCabinetMemoryService(new CustomValidator());
                     break;
 
                 default:
                     Console.WriteLine($"Unknown validation rules: {validationRules}. Using default rules.");
-                    fileCabinetService = new FileCabinetService(new DefaultValidator());
+                    fileCabinetService = new FileCabinetMemoryService(new DefaultValidator());
                     break;
             }
         }
