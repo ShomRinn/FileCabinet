@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using FileCabinetApp.Models;
 
 namespace FileCabinetApp.Services
@@ -46,15 +47,15 @@ namespace FileCabinetApp.Services
             char gender);
 
         /// <summary>
-        /// Returns all records.
+        /// Returns all active records.
         /// </summary>
         /// <returns>A read-only collection of records.</returns>
         ReadOnlyCollection<FileCabinetRecord> GetRecords();
 
         /// <summary>
-        /// Returns the count of records.
+        /// Returns the total count of active (non-deleted) records.
         /// </summary>
-        /// <returns>The total number of records.</returns>
+        /// <returns>The number of active records.</returns>
         int GetStat();
 
         /// <summary>
@@ -91,5 +92,21 @@ namespace FileCabinetApp.Services
         /// </summary>
         /// <param name="snapshot">The snapshot from which to restore.</param>
         void Restore(FileCabinetServiceSnapshot snapshot);
+
+        /// <summary>
+        /// Removes a record by ID. 
+        /// For memory-based service, the record is removed from the collection.
+        /// For file-based service, the record is marked as deleted.
+        /// </summary>
+        /// <param name="id">The record ID to remove.</param>
+        /// <returns>True if a record was removed (or marked as deleted), false if not found.</returns>
+        bool RemoveRecord(int id);
+
+        /// <summary>
+        /// Returns the number of records marked as deleted (if applicable).
+        /// Memory-based service always returns 0, because records are physically removed.
+        /// </summary>
+        /// <returns>The number of deleted records.</returns>
+        int GetDeletedCount();
     }
 }

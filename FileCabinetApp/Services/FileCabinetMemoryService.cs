@@ -1,36 +1,40 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Linq;
-using System.Text;
 using FileCabinetApp.Models;
 using FileCabinetApp.Validators;
 
 namespace FileCabinetApp.Services
 {
     /// <summary>
-    /// Provides file-based storage for FileCabinet records.
+    /// A memory-based service for storing FileCabinet records.
     /// </summary>
-    public class FileCabinetFilesystemService : IFileCabinetService
+    public class FileCabinetMemoryService : IFileCabinetService
     {
-        private const int RecordSize = 278;
-        private readonly FileStream fileStream;
+        private readonly List<FileCabinetRecord> list = new List<FileCabinetRecord>();
         private readonly IRecordValidator validator;
 
+        private readonly Dictionary<string, List<FileCabinetRecord>> firstNameDictionary =
+            new Dictionary<string, List<FileCabinetRecord>>(StringComparer.OrdinalIgnoreCase);
+
+        private readonly Dictionary<string, List<FileCabinetRecord>> lastNameDictionary =
+            new Dictionary<string, List<FileCabinetRecord>>(StringComparer.OrdinalIgnoreCase);
+
+        private readonly Dictionary<DateTime, List<FileCabinetRecord>> dateOfBirthDictionary =
+            new Dictionary<DateTime, List<FileCabinetRecord>>();
+
         /// <summary>
-        /// Initializes a new instance of the <see cref="FileCabinetFilesystemService"/> class.
+        /// Initializes a new instance of the <see cref="FileCabinetMemoryService"/> class.
         /// </summary>
-        /// <param name="fileStream">The file stream used for reading and writing records.</param>
-        /// <param name="validator">The validator used to validate record data.</param>
-        public FileCabinetFilesystemService(FileStream fileStream, IRecordValidator validator)
+        /// <param name="validator">The record validator.</param>
+        public FileCabinetMemoryService(IRecordValidator validator)
         {
-            this.fileStream = fileStream ?? throw new ArgumentNullException(nameof(fileStream));
             this.validator = validator ?? throw new ArgumentNullException(nameof(validator));
         }
 
         /// <summary>
-        /// Creates a new record in the file storage.
+        /// Creates a new record in memory.
         /// </summary>
         /// <param name="firstName">The first name.</param>
         /// <param name="lastName">The last name.</param>
@@ -38,7 +42,7 @@ namespace FileCabinetApp.Services
         /// <param name="height">The height.</param>
         /// <param name="salary">The salary.</param>
         /// <param name="gender">The gender.</param>
-        /// <returns>The ID of the new record.</returns>
+        /// <returns>The ID of the newly created record.</returns>
         public int CreateRecord(
             string firstName,
             string lastName,
@@ -49,41 +53,27 @@ namespace FileCabinetApp.Services
         {
             var record = new FileCabinetRecord
             {
+                Id = this.list.Count + 1,
                 FirstName = firstName,
                 LastName = lastName,
                 DateOfBirth = dateOfBirth,
                 Height = height,
                 Salary = salary,
-                Gender = gender
+                Gender = gender,
             };
 
             this.validator.ValidateParameters(record);
-            int newId = this.GetNextId();
-            record.Id = newId;
 
-            this.fileStream.Seek(0, SeekOrigin.End);
-            using (var writer = new BinaryWriter(this.fileStream, Encoding.UTF8, leaveOpen: true))
-            {
-                writer.Write((short)0);
-                writer.Write(record.Id);
-                WriteFixedString(writer, record.FirstName, 60);
-                WriteFixedString(writer, record.LastName, 60);
-                writer.Write(record.DateOfBirth.Year);
-                writer.Write(record.DateOfBirth.Month);
-                writer.Write(record.DateOfBirth.Day);
-                writer.Write(record.Height);
-                writer.Write(record.Salary);
-                writer.Write((short)record.Gender);
-            }
+            this.list.Add(record);
+            this.UpdateDictionaries(record);
 
-            this.fileStream.Flush();
-            return newId;
+            return record.Id;
         }
 
         /// <summary>
-        /// Edits an existing record in the file storage.
+        /// Edits an existing record.
         /// </summary>
-        /// <param name="id">The record ID to update.</param>
+        /// <param name="id">The record ID.</param>
         /// <param name="firstName">The new first name.</param>
         /// <param name="lastName">The new last name.</param>
         /// <param name="dateOfBirth">The new date of birth.</param>
@@ -99,7 +89,15 @@ namespace FileCabinetApp.Services
             decimal salary,
             char gender)
         {
-            var record = new FileCabinetRecord
+            var existing = this.list.Find(r => r.Id == id);
+            if (existing == null)
+            {
+                throw new ArgumentException($"Record with ID {id} not found.");
+            }
+
+            this.RemoveFromDictionaries(existing);
+
+            var temp = new FileCabinetRecord
             {
                 Id = id,
                 FirstName = firstName,
@@ -107,169 +105,97 @@ namespace FileCabinetApp.Services
                 DateOfBirth = dateOfBirth,
                 Height = height,
                 Salary = salary,
-                Gender = gender
+                Gender = gender,
             };
 
-            this.validator.ValidateParameters(record);
+            this.validator.ValidateParameters(temp);
 
-            this.fileStream.Seek(0, SeekOrigin.Begin);
-            using (var reader = new BinaryReader(this.fileStream, Encoding.UTF8, leaveOpen: true))
-            {
-                while (this.fileStream.Position < this.fileStream.Length)
-                {
-                    long position = this.fileStream.Position;
-                    short status = reader.ReadInt16();
-                    int currentId = reader.ReadInt32();
+            existing.FirstName = temp.FirstName;
+            existing.LastName = temp.LastName;
+            existing.DateOfBirth = temp.DateOfBirth;
+            existing.Height = temp.Height;
+            existing.Salary = temp.Salary;
+            existing.Gender = temp.Gender;
 
-                    this.fileStream.Seek(RecordSize - 6, SeekOrigin.Current);
-
-                    if (status == 0 && currentId == id)
-                    {
-                        this.fileStream.Seek(position, SeekOrigin.Begin);
-                        using (var writer = new BinaryWriter(this.fileStream, Encoding.UTF8, leaveOpen: true))
-                        {
-                            writer.Write((short)0);
-                            writer.Write(id);
-                            WriteFixedString(writer, record.FirstName, 60);
-                            WriteFixedString(writer, record.LastName, 60);
-                            writer.Write(record.DateOfBirth.Year);
-                            writer.Write(record.DateOfBirth.Month);
-                            writer.Write(record.DateOfBirth.Day);
-                            writer.Write(record.Height);
-                            writer.Write(record.Salary);
-                            writer.Write((short)record.Gender);
-                        }
-
-                        this.fileStream.Flush();
-                        return;
-                    }
-                }
-            }
-
-            throw new ArgumentException($"Record with ID {id} not found.");
+            this.UpdateDictionaries(existing);
         }
 
         /// <summary>
-        /// Gets all active records from the file storage.
+        /// Returns a read-only collection of all records in memory.
         /// </summary>
-        /// <returns>A read-only collection of active records.</returns>
+        /// <returns>A read-only collection.</returns>
         public ReadOnlyCollection<FileCabinetRecord> GetRecords()
         {
-            var records = new List<FileCabinetRecord>();
-
-            this.fileStream.Seek(0, SeekOrigin.Begin);
-            using (var reader = new BinaryReader(this.fileStream, Encoding.UTF8, leaveOpen: true))
-            {
-                while (this.fileStream.Position < this.fileStream.Length)
-                {
-                    long startPos = this.fileStream.Position;
-                    short status = reader.ReadInt16();
-                    int id = reader.ReadInt32();
-                    string firstName = ReadFixedString(reader, 60);
-                    string lastName = ReadFixedString(reader, 60);
-                    int year = reader.ReadInt32();
-                    int month = reader.ReadInt32();
-                    int day = reader.ReadInt32();
-                    short height = reader.ReadInt16();
-                    decimal salary = reader.ReadDecimal();
-                    short genderValue = reader.ReadInt16();
-
-                    if (status == 0)
-                    {
-                        records.Add(new FileCabinetRecord
-                        {
-                            Id = id,
-                            FirstName = firstName,
-                            LastName = lastName,
-                            DateOfBirth = new DateTime(year, month, day),
-                            Height = height,
-                            Salary = salary,
-                            Gender = (char)genderValue
-                        });
-                    }
-                }
-            }
-
-            return new ReadOnlyCollection<FileCabinetRecord>(records);
+            return this.list.AsReadOnly();
         }
 
         /// <summary>
-        /// Returns the count of active records (status=0).
+        /// Returns the total count of records in memory (since none are "deleted" conceptually).
         /// </summary>
-        /// <returns>The number of active records.</returns>
+        /// <returns>The count of records.</returns>
         public int GetStat()
         {
-            int count = 0;
-            this.fileStream.Seek(0, SeekOrigin.Begin);
-            using (var reader = new BinaryReader(this.fileStream, Encoding.UTF8, leaveOpen: true))
-            {
-                while (this.fileStream.Position < this.fileStream.Length)
-                {
-                    short status = reader.ReadInt16();
-                    this.fileStream.Seek(RecordSize - 2, SeekOrigin.Current);
-
-                    if (status == 0)
-                    {
-                        count++;
-                    }
-                }
-            }
-
-            return count;
+            return this.list.Count;
         }
 
         /// <summary>
         /// Finds records by first name.
         /// </summary>
-        /// <param name="firstName">The first name to match (case-insensitive).</param>
+        /// <param name="firstName">The first name.</param>
         /// <returns>A read-only collection of matching records.</returns>
         public ReadOnlyCollection<FileCabinetRecord> FindByFirstName(string firstName)
         {
-            var allRecords = this.GetRecords();
-            var result = allRecords.Where(r =>
-                r.FirstName.Equals(firstName, StringComparison.OrdinalIgnoreCase)).ToList();
-            return new ReadOnlyCollection<FileCabinetRecord>(result);
+            if (this.firstNameDictionary.TryGetValue(firstName, out var records))
+            {
+                return new ReadOnlyCollection<FileCabinetRecord>(records);
+            }
+
+            return new ReadOnlyCollection<FileCabinetRecord>(new List<FileCabinetRecord>());
         }
 
         /// <summary>
         /// Finds records by last name.
         /// </summary>
-        /// <param name="lastName">The last name to match (case-insensitive).</param>
+        /// <param name="lastName">The last name.</param>
         /// <returns>A read-only collection of matching records.</returns>
         public ReadOnlyCollection<FileCabinetRecord> FindByLastName(string lastName)
         {
-            var allRecords = this.GetRecords();
-            var result = allRecords.Where(r =>
-                r.LastName.Equals(lastName, StringComparison.OrdinalIgnoreCase)).ToList();
-            return new ReadOnlyCollection<FileCabinetRecord>(result);
+            if (this.lastNameDictionary.TryGetValue(lastName, out var records))
+            {
+                return new ReadOnlyCollection<FileCabinetRecord>(records);
+            }
+
+            return new ReadOnlyCollection<FileCabinetRecord>(new List<FileCabinetRecord>());
         }
 
         /// <summary>
         /// Finds records by date of birth.
         /// </summary>
-        /// <param name="dateOfBirth">The date of birth to match.</param>
+        /// <param name="dateOfBirth">The date of birth.</param>
         /// <returns>A read-only collection of matching records.</returns>
         public ReadOnlyCollection<FileCabinetRecord> FindByDateOfBirth(DateTime dateOfBirth)
         {
-            var allRecords = this.GetRecords();
-            var result = allRecords.Where(r => r.DateOfBirth == dateOfBirth).ToList();
-            return new ReadOnlyCollection<FileCabinetRecord>(result);
+            if (this.dateOfBirthDictionary.TryGetValue(dateOfBirth.Date, out var records))
+            {
+                return new ReadOnlyCollection<FileCabinetRecord>(records);
+            }
+
+            return new ReadOnlyCollection<FileCabinetRecord>(new List<FileCabinetRecord>());
         }
 
         /// <summary>
-        /// Creates a snapshot of current data.
+        /// Creates a snapshot of the current data.
         /// </summary>
-        /// <returns>A FileCabinetServiceSnapshot with all active records.</returns>
+        /// <returns>A FileCabinetServiceSnapshot containing all records.</returns>
         public FileCabinetServiceSnapshot MakeSnapshot()
         {
-            var records = this.GetRecords();
-            return new FileCabinetServiceSnapshot(records);
+            return new FileCabinetServiceSnapshot(this.list.AsReadOnly());
         }
 
         /// <summary>
-        /// Merges or updates data from the given snapshot.
-        /// Active records in the file are updated if the IDs match; new records are appended if they do not exist.
-        /// Invalid or conflicting records are skipped.
+        /// Restores data from the specified snapshot.
+        /// Existing records with the same ID are updated; new ones are added.
+        /// Invalid records are skipped with an error message.
         /// </summary>
         /// <param name="snapshot">The snapshot to restore from.</param>
         public void Restore(FileCabinetServiceSnapshot snapshot)
@@ -292,116 +218,97 @@ namespace FileCabinetApp.Services
                     continue;
                 }
 
-                // We can either update an existing record in place or add new at the end.
-                // Let's do a simplified approach:
-                var existing = this.FindRecordPosition(record.Id);
-                if (existing >= 0)
+                var existing = this.list.Find(r => r.Id == record.Id);
+                if (existing != null)
                 {
-                    // Update in place
-                    this.UpdateRecordInFile(record, existing);
+                    this.RemoveFromDictionaries(existing);
+
+                    existing.FirstName = record.FirstName;
+                    existing.LastName = record.LastName;
+                    existing.DateOfBirth = record.DateOfBirth;
+                    existing.Height = record.Height;
+                    existing.Salary = record.Salary;
+                    existing.Gender = record.Gender;
+
+                    this.UpdateDictionaries(existing);
                 }
                 else
                 {
-                    // Append as new
-                    this.AppendRecordToFile(record);
+                    this.list.Add(record);
+                    this.UpdateDictionaries(record);
                 }
             }
-        }
-
-        private int GetNextId()
-        {
-            return this.GetStat() + 1;
-        }
-
-        private static void WriteFixedString(BinaryWriter writer, string value, int maxLength)
-        {
-            var subStr = value.Length > maxLength ? value[..maxLength] : value;
-            for (int i = 0; i < maxLength; i++)
-            {
-                char c = i < subStr.Length ? subStr[i] : '\0';
-                writer.Write(c);
-            }
-        }
-
-        private static string ReadFixedString(BinaryReader reader, int length)
-        {
-            var chars = new char[length];
-            for (int i = 0; i < length; i++)
-            {
-                chars[i] = reader.ReadChar();
-            }
-
-            return new string(chars).TrimEnd('\0');
         }
 
         /// <summary>
-        /// Searches the file for a record with the given ID.
-        /// Returns the byte-position if found; otherwise returns -1.
+        /// Removes a record by ID (physically from the list and dictionaries).
         /// </summary>
-        /// <param name="id">The record ID to search for.</param>
-        /// <returns>The byte offset of the record start, or -1 if not found.</returns>
-        private long FindRecordPosition(int id)
+        /// <param name="id">The record ID to remove.</param>
+        /// <returns>True if a record was removed, false if not found.</returns>
+        public bool RemoveRecord(int id)
         {
-            this.fileStream.Seek(0, SeekOrigin.Begin);
-            using (var reader = new BinaryReader(this.fileStream, Encoding.UTF8, leaveOpen: true))
+            var record = this.list.Find(r => r.Id == id);
+            if (record == null)
             {
-                while (this.fileStream.Position < this.fileStream.Length)
-                {
-                    long position = this.fileStream.Position;
-                    short status = reader.ReadInt16();
-                    int currentId = reader.ReadInt32();
-
-                    if (status == 0 && currentId == id)
-                    {
-                        return position; // the beginning of this record
-                    }
-
-                    // Move to the next record
-                    this.fileStream.Seek(RecordSize - 6, SeekOrigin.Current);
-                }
+                return false;
             }
 
-            return -1;
+            this.RemoveFromDictionaries(record);
+            this.list.Remove(record);
+            return true;
         }
 
-        private void UpdateRecordInFile(FileCabinetRecord record, long position)
+        /// <summary>
+        /// Returns the number of deleted records (always 0 for memory service).
+        /// </summary>
+        /// <returns>0, because memory-based removal physically deletes the record.</returns>
+        public int GetDeletedCount()
         {
-            this.fileStream.Seek(position, SeekOrigin.Begin);
-            using (var writer = new BinaryWriter(this.fileStream, Encoding.UTF8, leaveOpen: true))
-            {
-                writer.Write((short)0);
-                writer.Write(record.Id);
-                WriteFixedString(writer, record.FirstName, 60);
-                WriteFixedString(writer, record.LastName, 60);
-                writer.Write(record.DateOfBirth.Year);
-                writer.Write(record.DateOfBirth.Month);
-                writer.Write(record.DateOfBirth.Day);
-                writer.Write(record.Height);
-                writer.Write(record.Salary);
-                writer.Write((short)record.Gender);
-            }
-
-            this.fileStream.Flush();
+            return 0;
         }
 
-        private void AppendRecordToFile(FileCabinetRecord record)
+        private void UpdateDictionaries(FileCabinetRecord record)
         {
-            this.fileStream.Seek(0, SeekOrigin.End);
-            using (var writer = new BinaryWriter(this.fileStream, Encoding.UTF8, leaveOpen: true))
+            if (!this.firstNameDictionary.TryGetValue(record.FirstName, out var firstNameRecords))
             {
-                writer.Write((short)0);
-                writer.Write(record.Id);
-                WriteFixedString(writer, record.FirstName, 60);
-                WriteFixedString(writer, record.LastName, 60);
-                writer.Write(record.DateOfBirth.Year);
-                writer.Write(record.DateOfBirth.Month);
-                writer.Write(record.DateOfBirth.Day);
-                writer.Write(record.Height);
-                writer.Write(record.Salary);
-                writer.Write((short)record.Gender);
+                firstNameRecords = new List<FileCabinetRecord>();
+                this.firstNameDictionary[record.FirstName] = firstNameRecords;
+            }
+            firstNameRecords.Add(record);
+
+            if (!this.lastNameDictionary.TryGetValue(record.LastName, out var lastNameRecords))
+            {
+                lastNameRecords = new List<FileCabinetRecord>();
+                this.lastNameDictionary[record.LastName] = lastNameRecords;
+            }
+            lastNameRecords.Add(record);
+
+            DateTime key = record.DateOfBirth.Date;
+            if (!this.dateOfBirthDictionary.TryGetValue(key, out var dobRecords))
+            {
+                dobRecords = new List<FileCabinetRecord>();
+                this.dateOfBirthDictionary[key] = dobRecords;
+            }
+            dobRecords.Add(record);
+        }
+
+        private void RemoveFromDictionaries(FileCabinetRecord record)
+        {
+            if (this.firstNameDictionary.TryGetValue(record.FirstName, out var firstNameRecords))
+            {
+                firstNameRecords.Remove(record);
             }
 
-            this.fileStream.Flush();
+            if (this.lastNameDictionary.TryGetValue(record.LastName, out var lastNameRecords))
+            {
+                lastNameRecords.Remove(record);
+            }
+
+            var key = record.DateOfBirth.Date;
+            if (this.dateOfBirthDictionary.TryGetValue(key, out var dobRecords))
+            {
+                dobRecords.Remove(record);
+            }
         }
     }
 }

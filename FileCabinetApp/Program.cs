@@ -19,7 +19,7 @@ namespace FileCabinetApp
         private const string DefaultValidationMessage = "Using default validation rules.";
         private const string CustomValidationMessage = "Using custom validation rules.";
 
-        private static string storageType = "memory";
+        private static string storageType = "file";
         private static IFileCabinetService? fileCabinetService;
         private static bool isRunning = true;
 
@@ -33,7 +33,9 @@ namespace FileCabinetApp
             ("edit", Edit),
             ("find", Find),
             ("export", Export),
-            ("import", Import), // Step 8: new command for importing data
+            ("import", Import),
+            ("remove", Remove), // Step 9: remove command
+            ("purge", Purge),   // Step 9: purge command
         };
 
         /// <summary>
@@ -171,13 +173,15 @@ namespace FileCabinetApp
             {
                 ("help", "Displays a list of all available commands. Use 'help <command>' for details about a specific command.", "Displays a list of all available commands. Use 'help <command>' for details about a specific command."),
                 ("exit", "Exits the application", "Terminates the program."),
-                ("stat", "Shows the statistics of records", "Displays the total number of records currently stored in the system."),
+                ("stat", "Shows the statistics of records", "Displays the total number of records (and how many are marked as deleted in file-based service)."),
                 ("create", "Creates a new record with personal data", "Allows you to add a new record by entering personal details step by step."),
                 ("list", "Lists all records in the system", "Displays all records stored in the system."),
                 ("edit", "Modifies an existing record by ID", "Allows you to update the details of an existing record. Usage: edit <record ID>."),
                 ("find", "Searches records by property", "Searches for records by a specific property (firstname, lastname, or dateofbirth). Usage: find <property> <value>."),
                 ("export", "Exports records to a file.", "Exports all records to a specified file in CSV or XML format. Usage: export <csv/xml> <file path>."),
                 ("import", "Imports records from a file.", "Imports records from CSV or XML. Usage: import <csv/xml> <file path>."),
+                ("remove", "Removes a record by ID", "Usage: remove <record ID>. For file-based service, marks the record as deleted."),
+                ("purge", "Defragments the data file (file-based only).", "Usage: purge. Moves all active records to remove 'empty' spaces from deleted records."),
             };
 
             if (!string.IsNullOrEmpty(parameters))
@@ -216,13 +220,29 @@ namespace FileCabinetApp
         }
 
         /// <summary>
-        /// Prints the number of records currently in the service.
+        /// Prints the number of records and how many are marked as deleted (for file-based service).
         /// </summary>
         /// <param name="parameters">Not used.</param>
         private static void Stat(string parameters)
         {
-            var count = fileCabinetService?.GetStat() ?? 0;
-            Console.WriteLine($"{count} record(s).");
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
+            // We assume FileCabinetFilesystemService provides a method GetDeletedCount().
+            // If memory-based, that method may always return 0, or not exist.
+            // Adjust as needed if your code differs.
+            int total = fileCabinetService.GetStat();
+            int deleted = 0;
+
+            if (fileCabinetService is FileCabinetFilesystemService fsService)
+            {
+                deleted = fsService.GetDeletedCount();
+            }
+
+            Console.WriteLine($"{total} record(s). {deleted} record(s) are deleted.");
         }
 
         /// <summary>
@@ -591,6 +611,68 @@ namespace FileCabinetApp
             catch (System.InvalidOperationException ex)
             {
                 Console.WriteLine($"Import XML error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Removes a record by ID. Step 9 - remove command.
+        /// </summary>
+        /// <param name="parameters">The ID of the record to remove.</param>
+        private static void Remove(string parameters)
+        {
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
+            if (!int.TryParse(parameters, out int id) || id <= 0)
+            {
+                Console.WriteLine("Invalid ID format.");
+                return;
+            }
+
+            try
+            {
+                bool success = fileCabinetService.RemoveRecord(id);
+                if (success)
+                {
+                    Console.WriteLine($"Record #{id} is removed.");
+                }
+                else
+                {
+                    Console.WriteLine($"Record #{id} doesn't exist.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error removing record #{id}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Purges the data file (file-based service only). Step 9 - purge command.
+        /// </summary>
+        /// <param name="parameters">Not used.</param>
+        private static void Purge(string parameters)
+        {
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
+            // We check for an actual FileCabinetFilesystemService instance.
+            // If memory-based, the command is not applicable.
+            if (fileCabinetService is FileCabinetFilesystemService fsService)
+            {
+                // Suppose you implemented Purge to return (int totalBefore, int purged).
+                var (totalBefore, purged) = fsService.Purge();
+                Console.WriteLine($"Data file processing is completed: {purged} of {totalBefore} records were purged.");
+            }
+            else
+            {
+                Console.WriteLine("Purge is not applicable for the current storage type.");
             }
         }
     }
