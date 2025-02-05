@@ -9,6 +9,9 @@ using FileCabinetApp.Validators;
 
 namespace FileCabinetApp
 {
+    /// <summary>
+    /// The main entry point of the File Cabinet Application.
+    /// </summary>
     public static class Program
     {
         private const string DeveloperName = "Heorhi Bachyla";
@@ -17,9 +20,7 @@ namespace FileCabinetApp
         private const string CustomValidationMessage = "Using custom validation rules.";
 
         private static string storageType = "memory";
-
         private static IFileCabinetService? fileCabinetService;
-
         private static bool isRunning = true;
 
         private static readonly (string Command, Action<string> Action)[] Commands = new (string, Action<string>)[]
@@ -32,8 +33,13 @@ namespace FileCabinetApp
             ("edit", Edit),
             ("find", Find),
             ("export", Export),
+            ("import", Import), // Step 8: new command for importing data
         };
 
+        /// <summary>
+        /// Application entry point.
+        /// </summary>
+        /// <param name="args">Command-line arguments.</param>
         public static void Main(string[] args)
         {
             if (args == null)
@@ -41,10 +47,7 @@ namespace FileCabinetApp
                 throw new ArgumentNullException(nameof(args), "The argument 'args' cannot be null.");
             }
 
-            // 1. Разбираем, какой тип хранения выбрал пользователь (--storage/-s).
             SetStorageType(args);
-
-            // 2. Разбираем, какие правила валидации выбрать (--validation-rules или -v).
             SetValidationRules(args);
 
             Console.WriteLine($"File Cabinet Application, developed by {DeveloperName}");
@@ -56,8 +59,7 @@ namespace FileCabinetApp
                 Console.Write("> ");
                 var line = Console.ReadLine();
                 var inputs = line?.Split(' ', 2) ?? new string[] { string.Empty, string.Empty };
-                const int commandIndex = 0;
-                var command = inputs[commandIndex];
+                var command = inputs[0];
 
                 if (string.IsNullOrEmpty(command))
                 {
@@ -68,8 +70,7 @@ namespace FileCabinetApp
                 var index = Array.FindIndex(Commands, c => c.Command.Equals(command, StringComparison.OrdinalIgnoreCase));
                 if (index >= 0)
                 {
-                    const int parametersIndex = 1;
-                    var parameters = inputs.Length > 1 ? inputs[parametersIndex] : string.Empty;
+                    var parameters = inputs.Length > 1 ? inputs[1] : string.Empty;
                     Commands[index].Action(parameters);
                 }
                 else
@@ -81,9 +82,9 @@ namespace FileCabinetApp
         }
 
         /// <summary>
-        /// Устанавливает тип хранения (memory/file) на основе параметров командной строки.
+        /// Determines the storage type (memory/file) from command-line arguments.
         /// </summary>
-        /// <param name="args">Аргументы командной строки.</param>
+        /// <param name="args">Command-line arguments.</param>
         private static void SetStorageType(string[] args)
         {
             foreach (var arg in args)
@@ -100,10 +101,10 @@ namespace FileCabinetApp
         }
 
         /// <summary>
-        /// Устанавливает правила валидации (default/custom) и создаёт соответствующий сервис,
-        /// учитывая выбранный тип хранилища (memory/file).
+        /// Determines the validation rules (default/custom) from command-line arguments,
+        /// then initializes the IFileCabinetService depending on storageType.
         /// </summary>
-        /// <param name="args">Аргументы командной строки.</param>
+        /// <param name="args">Command-line arguments.</param>
         private static void SetValidationRules(string[] args)
         {
             string validationRules = "DEFAULT";
@@ -134,7 +135,6 @@ namespace FileCabinetApp
 
             Console.WriteLine(validationRules == "CUSTOM" ? CustomValidationMessage : DefaultValidationMessage);
 
-            // Теперь, в зависимости от storageType, инициализируем сервис
             switch (storageType)
             {
                 case "file":
@@ -151,12 +151,20 @@ namespace FileCabinetApp
             }
         }
 
+        /// <summary>
+        /// Prints a message if the command does not exist.
+        /// </summary>
+        /// <param name="command">The unknown command.</param>
         private static void PrintMissedCommandInfo(string command)
         {
             Console.WriteLine($"There is no '{command}' command.");
             Console.WriteLine();
         }
 
+        /// <summary>
+        /// Prints the help information or detailed info about a specific command.
+        /// </summary>
+        /// <param name="parameters">The command name for details.</param>
         private static void PrintHelp(string parameters)
         {
             var helpMessages = new (string Command, string ShortDescription, string DetailedDescription)[]
@@ -169,12 +177,12 @@ namespace FileCabinetApp
                 ("edit", "Modifies an existing record by ID", "Allows you to update the details of an existing record. Usage: edit <record ID>."),
                 ("find", "Searches records by property", "Searches for records by a specific property (firstname, lastname, or dateofbirth). Usage: find <property> <value>."),
                 ("export", "Exports records to a file.", "Exports all records to a specified file in CSV or XML format. Usage: export <csv/xml> <file path>."),
+                ("import", "Imports records from a file.", "Imports records from CSV or XML. Usage: import <csv/xml> <file path>."),
             };
 
             if (!string.IsNullOrEmpty(parameters))
             {
                 var commandDescription = Array.Find(helpMessages, h => h.Command.Equals(parameters, StringComparison.OrdinalIgnoreCase));
-
                 if (string.IsNullOrEmpty(commandDescription.Command))
                 {
                     Console.WriteLine($"There is no explanation for the '{parameters}' command.");
@@ -197,18 +205,30 @@ namespace FileCabinetApp
             Console.WriteLine();
         }
 
+        /// <summary>
+        /// Exits the application.
+        /// </summary>
+        /// <param name="parameters">Not used.</param>
         private static void Exit(string parameters)
         {
             Console.WriteLine("Exiting the application...");
             isRunning = false;
         }
 
+        /// <summary>
+        /// Prints the number of records currently in the service.
+        /// </summary>
+        /// <param name="parameters">Not used.</param>
         private static void Stat(string parameters)
         {
             var count = fileCabinetService?.GetStat() ?? 0;
             Console.WriteLine($"{count} record(s).");
         }
 
+        /// <summary>
+        /// Creates a new record with user input.
+        /// </summary>
+        /// <param name="parameters">Not used.</param>
         private static void Create(string parameters)
         {
             if (fileCabinetService is null)
@@ -274,6 +294,10 @@ namespace FileCabinetApp
             }
         }
 
+        /// <summary>
+        /// Lists all records in the current service.
+        /// </summary>
+        /// <param name="parameters">Not used.</param>
         private static void List(string parameters)
         {
             if (fileCabinetService is null)
@@ -292,10 +316,16 @@ namespace FileCabinetApp
 
             foreach (var record in records)
             {
-                Console.WriteLine($"#{record.Id}, {record.FirstName}, {record.LastName}, {record.DateOfBirth:yyyy-MMM-dd}, {record.Height} cm, {record.Salary:C}, {record.Gender}");
+                Console.WriteLine(
+                    $"#{record.Id}, {record.FirstName}, {record.LastName}, " +
+                    $"{record.DateOfBirth:yyyy-MMM-dd}, {record.Height} cm, {record.Salary:C}, {record.Gender}");
             }
         }
 
+        /// <summary>
+        /// Edits an existing record by ID.
+        /// </summary>
+        /// <param name="parameters">Should be the record ID.</param>
         private static void Edit(string parameters)
         {
             if (fileCabinetService is null)
@@ -357,6 +387,10 @@ namespace FileCabinetApp
             }
         }
 
+        /// <summary>
+        /// Finds records by a specified property (FIRSTNAME, LASTNAME, DATEOFBIRTH).
+        /// </summary>
+        /// <param name="parameters">Property and value separated by space.</param>
         private static void Find(string parameters)
         {
             if (fileCabinetService is null)
@@ -379,9 +413,8 @@ namespace FileCabinetApp
             {
                 "FIRSTNAME" => fileCabinetService.FindByFirstName(value),
                 "LASTNAME" => fileCabinetService.FindByLastName(value),
-                "DATEOFBIRTH" => DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dateOfBirth)
-                    ? fileCabinetService.FindByDateOfBirth(dateOfBirth)
-                    : new ReadOnlyCollection<FileCabinetRecord>(Array.Empty<FileCabinetRecord>()),
+                "DATEOFBIRTH" when DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dob)
+                    => fileCabinetService.FindByDateOfBirth(dob),
                 _ => new ReadOnlyCollection<FileCabinetRecord>(Array.Empty<FileCabinetRecord>()),
             };
 
@@ -394,14 +427,24 @@ namespace FileCabinetApp
             PrintRecords(results);
         }
 
+        /// <summary>
+        /// Helper method to print a collection of records.
+        /// </summary>
+        /// <param name="records">Records to print.</param>
         private static void PrintRecords(IReadOnlyCollection<FileCabinetRecord> records)
         {
             foreach (var record in records)
             {
-                Console.WriteLine($"#{record.Id}, {record.FirstName}, {record.LastName}, {record.DateOfBirth:yyyy-MMM-dd}, {record.Height} cm, {record.Salary:C}, {record.Gender}");
+                Console.WriteLine(
+                    $"#{record.Id}, {record.FirstName}, {record.LastName}, " +
+                    $"{record.DateOfBirth:yyyy-MMM-dd}, {record.Height} cm, {record.Salary:C}, {record.Gender}");
             }
         }
 
+        /// <summary>
+        /// Exports records to a specified file in CSV or XML format.
+        /// </summary>
+        /// <param name="parameters">Format and file name.</param>
         private static void Export(string parameters)
         {
             if (fileCabinetService is null)
@@ -443,7 +486,6 @@ namespace FileCabinetApp
                         {
                             snapshot.SaveToXml(xmlWriter);
                         }
-
                         Console.WriteLine($"All records are exported to file {fileName}.");
                         break;
 
@@ -455,6 +497,100 @@ namespace FileCabinetApp
             catch (IOException ex)
             {
                 Console.WriteLine($"Export failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Imports records from a CSV or XML file.
+        /// </summary>
+        /// <param name="parameters">Format and file name.</param>
+        private static void Import(string parameters)
+        {
+            if (fileCabinetService is null)
+            {
+                Console.WriteLine("File cabinet service not initialized.");
+                return;
+            }
+
+            var inputs = parameters.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (inputs.Length != 2)
+            {
+                Console.WriteLine("Usage: import <csv|xml> <filename>");
+                return;
+            }
+
+            string format = inputs[0].ToLowerInvariant();
+            string fileName = inputs[1];
+
+            if (!File.Exists(fileName))
+            {
+                Console.WriteLine($"Import error: file {fileName} is not exist.");
+                return;
+            }
+
+            switch (format)
+            {
+                case "csv":
+                    ImportCsv(fileName);
+                    break;
+
+                case "xml":
+                    ImportXml(fileName);
+                    break;
+
+                default:
+                    Console.WriteLine($"Unknown import format: {format}");
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Imports records from a CSV file.
+        /// </summary>
+        /// <param name="fileName">The CSV file name.</param>
+        private static void ImportCsv(string fileName)
+        {
+            try
+            {
+                using var reader = new StreamReader(fileName);
+                var snapshot = new FileCabinetServiceSnapshot(new ReadOnlyCollection<FileCabinetRecord>(Array.Empty<FileCabinetRecord>()));
+                snapshot.LoadFromCsv(reader);
+
+                fileCabinetService.Restore(snapshot);
+
+                int importedCount = snapshot.Records.Count;
+                Console.WriteLine($"{importedCount} records were imported from {fileName}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Import CSV error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Imports records from an XML file.
+        /// </summary>
+        /// <param name="fileName">The XML file name.</param>
+        private static void ImportXml(string fileName)
+        {
+            try
+            {
+                using var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
+                var snapshot = new FileCabinetServiceSnapshot(new ReadOnlyCollection<FileCabinetRecord>(Array.Empty<FileCabinetRecord>()));
+                snapshot.LoadFromXml(fs);
+
+                fileCabinetService.Restore(snapshot);
+
+                int importedCount = snapshot.Records.Count;
+                Console.WriteLine($"{importedCount} records were imported from {fileName}.");
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"Import XML error: {ex.Message}");
+            }
+            catch (System.InvalidOperationException ex)
+            {
+                Console.WriteLine($"Import XML error: {ex.Message}");
             }
         }
     }
